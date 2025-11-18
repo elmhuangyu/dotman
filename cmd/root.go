@@ -20,9 +20,6 @@ var rootCmd = &cobra.Command{
 	Long: `dotman is a CLI tool for managing and installing dotfiles.
 It provides commands to install, uninstall, and verify dotfile configurations.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		// Initialize logger
-		logger.Init()
-
 		// Set debug mode if flag is provided
 		if debugFlag {
 			logger.SetDebugMode()
@@ -70,4 +67,3 @@ func getDefaultDotfilesDir() string {
 	}
 	return filepath.Join(home, ".config", "dotfiles")
 }
-

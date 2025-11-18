@@ -13,12 +13,15 @@ var (
 )
 
 // Init initializes the global logger with default configuration
-func Init() {
+func init() {
 	// Default to info level
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 
 	// Configure console writer with colors
-	output := zerolog.ConsoleWriter{Out: os.Stdout}
+	output := zerolog.ConsoleWriter{
+		Out:             os.Stdout,
+		FormatTimestamp: func(i interface{}) string { return "" },
+	}
 
 	// Create logger
 	Logger = log.Output(output)

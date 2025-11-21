@@ -37,7 +37,7 @@ func LoadConfig(moduleDir string) (*ModuleConfig, error) {
 	}
 
 	// Validate config
-	if err := validateConfig(&config); err != nil {
+	if err := validateModuleConfig(&config); err != nil {
 		return nil, fmt.Errorf("invalid config in %s: %w", configPath, err)
 	}
 
@@ -46,8 +46,8 @@ func LoadConfig(moduleDir string) (*ModuleConfig, error) {
 	return &config, nil
 }
 
-// validateConfig validates the configuration structure and values
-func validateConfig(config *ModuleConfig) error {
+// validateModuleConfig validates the configuration structure and values
+func validateModuleConfig(config *ModuleConfig) error {
 	if config.TargetDir == "" {
 		return fmt.Errorf("target_dir field is required")
 	}

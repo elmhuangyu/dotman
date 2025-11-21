@@ -6,10 +6,17 @@ import (
 )
 
 type Config struct {
-	Modules []ModuleConfig
+	RootConfig RootConfig
+	Modules    []ModuleConfig
 }
 
 func LoadDir(rootDir string) (*Config, error) {
+	// Load root config
+	rootConfig, err := LoadRootConfig(rootDir)
+	if err != nil {
+		return nil, err
+	}
+
 	ls, err := os.ReadDir(rootDir)
 	if err != nil {
 		return nil, err
@@ -18,6 +25,11 @@ func LoadDir(rootDir string) (*Config, error) {
 	var modules []ModuleConfig
 	for _, entry := range ls {
 		if !entry.IsDir() {
+			continue
+		}
+
+		// Skip excluded modules
+		if rootConfig.IsModuleExcluded(entry.Name()) {
 			continue
 		}
 
@@ -31,5 +43,8 @@ func LoadDir(rootDir string) (*Config, error) {
 		}
 	}
 
-	return &Config{Modules: modules}, nil
+	return &Config{
+		RootConfig: rootConfig,
+		Modules:    modules,
+	}, nil
 }

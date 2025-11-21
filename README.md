@@ -35,7 +35,7 @@ The CLI tool provides professional subcommand handling with Cobra and structured
 - `--debug`: Enable debug logging for verbose output
 - `--dir <path>`: Specify custom dotfiles directory (default: `$HOME/.config/dotfiles`)
 
-### Module Configuration
+### Configuration
 
 dotman supports modular dotfile management using "Dotfile" configuration files. Each module directory can contain a `Dotfile` YAML that specifies where files should be mapped.
 
@@ -43,6 +43,7 @@ dotman supports modular dotfile management using "Dotfile" configuration files. 
 
 ```
 ~/.config/dotfiles/
+├── DotRoot                 # Root configuration file
 ├── nvim/
 │   ├── init.vim
 │   ├── Dotfile
@@ -51,10 +52,35 @@ dotman supports modular dotfile management using "Dotfile" configuration files. 
 ├── git/
 │   ├── .gitconfig
 │   └── Dotfile
-└── bash/
-    ├── .bashrc
-    └── Dotfile
+├── bash/
+│   ├── .bashrc
+│   └── Dotfile
+├── temp/                   # Will be excluded by DotRoot, see below
+│   └── Dotfile
+└── backup/                 # Will be excluded by DotRoot, see below
+    └── old-config/
 ```
+
+#### Root Configuration (DotRoot)
+
+You can create a `DotRoot` file in your dotfiles root directory to configure global settings:
+
+```yaml
+# ~/.config/dotfiles/DotRoot
+vars:
+  USERNAME: "john"
+  HOMEDIR: "/home/john"
+  VERSION: "1.0.0"
+exclude_modules:
+  - "temp"
+  - "backup"
+  - "old-config"
+```
+
+**Root Configuration Fields:**
+- `vars`: Define variables that can be used in module configurations (currently for future templating support)
+- `exclude_modules`: List of module directory names to skip during installation
+
 
 #### Dotfile Configuration Format
 

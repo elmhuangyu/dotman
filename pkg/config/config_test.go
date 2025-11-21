@@ -38,6 +38,7 @@ func TestLoadDir_Success(t *testing.T) {
 				nvimPath := filepath.Join(tmpDir, "MultipleValidModules", "nvim")
 				bashPath := filepath.Join(tmpDir, "MultipleValidModules", "bash")
 				return &Config{
+					RootConfig: RootConfig{},
 					Modules: []ModuleConfig{
 						{Dir: nvimPath, TargetDir: "/home/user/.config/nvim"},
 						{Dir: bashPath, TargetDir: "/home/user"},
@@ -51,7 +52,10 @@ func TestLoadDir_Success(t *testing.T) {
 				// No directories created
 			},
 			wantConfig: func(tmpDir string) *Config {
-				return &Config{Modules: []ModuleConfig{}}
+				return &Config{
+					RootConfig: RootConfig{},
+					Modules:    []ModuleConfig{},
+				}
 			},
 		},
 		{
@@ -63,7 +67,10 @@ func TestLoadDir_Success(t *testing.T) {
 				require.NoError(t, err)
 			},
 			wantConfig: func(tmpDir string) *Config {
-				return &Config{Modules: []ModuleConfig{}}
+				return &Config{
+					RootConfig: RootConfig{},
+					Modules:    []ModuleConfig{},
+				}
 			},
 		},
 		{
@@ -80,7 +87,10 @@ func TestLoadDir_Success(t *testing.T) {
 				require.NoError(t, err)
 			},
 			wantConfig: func(tmpDir string) *Config {
-				return &Config{Modules: []ModuleConfig{}}
+				return &Config{
+					RootConfig: RootConfig{},
+					Modules:    []ModuleConfig{},
+				}
 			},
 		},
 		{
@@ -94,10 +104,116 @@ func TestLoadDir_Success(t *testing.T) {
 			},
 			wantConfig: func(tmpDir string) *Config {
 				return &Config{
+					RootConfig: RootConfig{},
 					Modules: []ModuleConfig{
 						{
 							Dir:       filepath.Join(tmpDir, "SingleValidModule", "single"),
 							TargetDir: "/home/user/.config/single",
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "WithValidRootConfig",
+			setupFunc: func(t *testing.T, rootDir string) {
+				// Create root config
+				err := os.WriteFile(filepath.Join(rootDir, "DotRoot"), []byte(`vars:
+  USERNAME: "john"
+  HOMEDIR: "/home/john"
+exclude_modules:
+  - "temp"
+  - "backup"`), 0644)
+				require.NoError(t, err)
+
+				// Create a module
+				moduleDir := filepath.Join(rootDir, "nvim")
+				err = os.Mkdir(moduleDir, 0755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(moduleDir, "Dotfile"), []byte(`target_dir: "/home/user/.config/nvim"`), 0644)
+				require.NoError(t, err)
+			},
+			wantConfig: func(tmpDir string) *Config {
+				return &Config{
+					RootConfig: RootConfig{
+						Vars: map[string]string{
+							"USERNAME": "john",
+							"HOMEDIR":  "/home/john",
+						},
+						ExcludeModules: []string{"temp", "backup"},
+					},
+					Modules: []ModuleConfig{
+						{
+							Dir:       filepath.Join(tmpDir, "WithValidRootConfig", "nvim"),
+							TargetDir: "/home/user/.config/nvim",
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "WithEmptyRootConfig",
+			setupFunc: func(t *testing.T, rootDir string) {
+				// Create empty root config
+				err := os.WriteFile(filepath.Join(rootDir, "DotRoot"), []byte(`vars: {}
+exclude_modules: []`), 0644)
+				require.NoError(t, err)
+
+				// Create a module
+				moduleDir := filepath.Join(rootDir, "bash")
+				err = os.Mkdir(moduleDir, 0755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(moduleDir, "Dotfile"), []byte(`target_dir: "/home/user"`), 0644)
+				require.NoError(t, err)
+			},
+			wantConfig: func(tmpDir string) *Config {
+				return &Config{
+					RootConfig: RootConfig{
+						Vars:           map[string]string{},
+						ExcludeModules: []string{},
+					},
+					Modules: []ModuleConfig{
+						{
+							Dir:       filepath.Join(tmpDir, "WithEmptyRootConfig", "bash"),
+							TargetDir: "/home/user",
+						},
+					},
+				}
+			},
+		},
+		{
+			name: "RootConfigWithExcludeModules",
+			setupFunc: func(t *testing.T, rootDir string) {
+				// Create root config with exclude modules
+				err := os.WriteFile(filepath.Join(rootDir, "DotRoot"), []byte(`vars: {}
+exclude_modules:
+  - "excluded-module"
+  - "test-module"`), 0644)
+				require.NoError(t, err)
+
+				// Create modules (including excluded ones)
+				excludedDir := filepath.Join(rootDir, "excluded-module")
+				err = os.Mkdir(excludedDir, 0755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(excludedDir, "Dotfile"), []byte(`target_dir: "/home/user/.config/excluded"`), 0644)
+				require.NoError(t, err)
+
+				includedDir := filepath.Join(rootDir, "included-module")
+				err = os.Mkdir(includedDir, 0755)
+				require.NoError(t, err)
+				err = os.WriteFile(filepath.Join(includedDir, "Dotfile"), []byte(`target_dir: "/home/user/.config/included"`), 0644)
+				require.NoError(t, err)
+			},
+			wantConfig: func(tmpDir string) *Config {
+				return &Config{
+					RootConfig: RootConfig{
+						Vars:           map[string]string{},
+						ExcludeModules: []string{"excluded-module", "test-module"},
+					},
+					Modules: []ModuleConfig{
+						{
+							Dir:       filepath.Join(tmpDir, "RootConfigWithExcludeModules", "included-module"),
+							TargetDir: "/home/user/.config/included",
 						},
 					},
 				}
@@ -116,6 +232,7 @@ func TestLoadDir_Success(t *testing.T) {
 			require.NoError(t, err)
 
 			expected := tt.wantConfig(tmpDir)
+			assert.Equal(t, expected.RootConfig, config.RootConfig)
 			assert.ElementsMatch(t, expected.Modules, config.Modules)
 		})
 	}
@@ -159,6 +276,39 @@ func TestLoadDir_Error(t *testing.T) {
 				// Don't create anything
 			},
 			errContains: "no such file or directory",
+		},
+		{
+			name: "InvalidRootConfig",
+			setupFunc: func(t *testing.T, rootDir string) {
+				// Create invalid root config with bad YAML
+				err := os.WriteFile(filepath.Join(rootDir, "DotRoot"), []byte(`vars:
+  USERNAME: "john
+  HOMEDIR: "/home/john"`), 0644)
+				require.NoError(t, err)
+			},
+			errContains: "failed to parse root config file",
+		},
+		{
+			name: "InvalidRootConfigVars",
+			setupFunc: func(t *testing.T, rootDir string) {
+				// Create invalid root config with invalid var key
+				err := os.WriteFile(filepath.Join(rootDir, "DotRoot"), []byte(`vars:
+  USER-NAME: "john"
+exclude_modules: []`), 0644)
+				require.NoError(t, err)
+			},
+			errContains: "contains invalid characters",
+		},
+		{
+			name: "InvalidRootConfigExcludeModules",
+			setupFunc: func(t *testing.T, rootDir string) {
+				// Create invalid root config with invalid exclude module
+				err := os.WriteFile(filepath.Join(rootDir, "DotRoot"), []byte(`vars: {}
+exclude_modules:
+  - "module/invalid"`), 0644)
+				require.NoError(t, err)
+			},
+			errContains: "exclude_modules[0] 'module/invalid' contains invalid characters",
 		},
 	}
 

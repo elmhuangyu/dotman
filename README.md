@@ -35,17 +35,47 @@ The CLI tool provides professional subcommand handling with Cobra and structured
 - `--debug`: Enable debug logging for verbose output
 - `--dir <path>`: Specify custom dotfiles directory (default: `$HOME/.config/dotfiles`)
 
+### Module Configuration
+
+dotman supports modular dotfile management using "Dotfile" configuration files. Each module directory can contain a `Dotfile` YAML that specifies where files should be mapped.
+
+#### Example Directory Structure
+
+```
+~/.config/dotfiles/
+├── nvim/
+│   ├── init.vim
+│   ├── Dotfile
+│   └── lua/
+│       └── config.lua
+├── git/
+│   ├── .gitconfig
+│   └── Dotfile
+└── bash/
+    ├── .bashrc
+    └── Dotfile
+```
+
+#### Dotfile Configuration Format
+
+Each module can contain a `Dotfile` YAML configuration:
+
+```yaml
+# nvim/Dotfile
+target_dir: "/home/user/.config/nvim"
+```
+
 ### Commands
 
 #### `install`
 
-The `install` subcommand creates symbolic links for your dotfiles in your home directory.
+The `install` subcommand creates symbolic links for your dotfiles based on module configurations.
 
 ```bash
-# Basic usage
+# Basic usage - installs all modules with Dotfile configurations
 dotman install
 
-# With debug logging
+# With debug logging to see detailed operations
 dotman --debug install
 
 # With custom dotfiles directory
@@ -54,7 +84,7 @@ dotman --dir /path/to/dotfiles install
 
 #### `uninstall`
 
-The `uninstall` subcommand removes the symbolic links created by the `install` command.
+The `uninstall` subcommand removes symbolic links created by dotman, safely leaving other files untouched.
 
 ```bash
 dotman uninstall
@@ -65,13 +95,10 @@ dotman --debug uninstall
 
 #### `verify`
 
-The `verify` subcommand checks if the symbolic links are correctly set up.
+The `verify` subcommand checks if symbolic links are correctly set up and reports any issues.
 
 ```bash
 dotman verify
-
-# With custom directory
-dotman --dir /tmp/test-dotfiles verify
 ```
 
 #### Getting Help
@@ -83,6 +110,14 @@ dotman --help
 # Show help for a specific command
 dotman install --help
 ```
+
+### Features
+
+- **Modular Configuration**: Each module has its own `Dotfile` configuration
+- **Safe Installation**: Only creates symbolic links, never overwrites files without warning
+- **Safe Uninstallation**: Only removes links created by dotman
+- **Verification**: Ensures links point to correct sources
+- **Detailed Logging**: Debug mode provides detailed operation information
 
 ## License
 

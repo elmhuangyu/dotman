@@ -1,3 +1,10 @@
+# Go Unit Testing Rules
+
+- Use Table-Driven Tests for Error Cases
+- Use `stretchr/testify` lib instead of raw comparsion
+- Use `testing.T.Cleanup` instead of defer cleanup
+- Use `testing.T.Tmpdir` to create tmp dir when necessary
+
 <!-- OPENSPEC:START -->
 # OpenSpec Instructions
 

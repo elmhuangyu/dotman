@@ -36,6 +36,8 @@ It provides commands to install, uninstall, and verify dotfile configurations.`,
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {
+		log := logger.GetLogger()
+		log.Error().Msg(err.Error())
 		os.Exit(1)
 	}
 }

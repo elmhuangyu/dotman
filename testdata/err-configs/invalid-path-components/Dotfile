@@ -1,0 +1,6 @@
+target_dir: "/home/user/./config/../invalid/path"
+
+# This is an invalid configuration because:
+# 1. The path contains invalid components (./, ../)
+# 2. filepath.Clean() would normalize this differently
+# 3. The cleaned path doesn't match the original

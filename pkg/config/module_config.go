@@ -11,7 +11,8 @@ import (
 // ModuleConfig represents the structure of a Dotfile configuration
 type ModuleConfig struct {
 	Dir       string
-	TargetDir string `yaml:"target_dir"`
+	TargetDir string   `yaml:"target_dir"`
+	Ignores   []string `yaml:"ignores"`
 }
 
 // LoadConfig loads and parses a Dotfile configuration from the specified directory
@@ -59,6 +60,13 @@ func validateConfig(config *ModuleConfig) error {
 	// For absolute paths, ensure they're properly formatted
 	if filepath.Clean(config.TargetDir) != config.TargetDir {
 		return fmt.Errorf("target_dir contains invalid path components")
+	}
+
+	// Validate ignores list - ensure no empty strings
+	for i, ignore := range config.Ignores {
+		if ignore == "" {
+			return fmt.Errorf("ignores[%d] cannot be empty", i)
+		}
 	}
 
 	return nil

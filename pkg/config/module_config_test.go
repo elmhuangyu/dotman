@@ -32,6 +32,7 @@ func TestLoadConfig(t *testing.T) {
 			wantConfig: &ModuleConfig{
 				Dir:       filepath.Join(tmpDir, "ValidConfig"),
 				TargetDir: "/home/user/.config/nvim",
+				Ignores:   nil,
 			},
 			wantErr: false,
 		},
@@ -85,6 +86,57 @@ func TestLoadConfig(t *testing.T) {
 			wantConfig:  nil,
 			wantErr:     true,
 			errContains: "target_dir must be an absolute path",
+		},
+		{
+			name: "ValidConfigWithIgnores",
+			setupFunc: func(t *testing.T, dir string) string {
+				configPath := filepath.Join(dir, "Dotfile")
+				err := os.WriteFile(configPath, []byte(`target_dir: "/home/user/.config/nvim"
+ignores:
+  - "*.log"
+  - "temp/"
+  - ".env"`), 0644)
+				require.NoError(t, err)
+				return dir
+			},
+			wantConfig: &ModuleConfig{
+				Dir:       filepath.Join(tmpDir, "ValidConfigWithIgnores"),
+				TargetDir: "/home/user/.config/nvim",
+				Ignores:   []string{"*.log", "temp/", ".env"},
+			},
+			wantErr: false,
+		},
+		{
+			name: "ValidConfigWithEmptyIgnores",
+			setupFunc: func(t *testing.T, dir string) string {
+				configPath := filepath.Join(dir, "Dotfile")
+				err := os.WriteFile(configPath, []byte(`target_dir: "/home/user/.config/nvim"
+ignores: []`), 0644)
+				require.NoError(t, err)
+				return dir
+			},
+			wantConfig: &ModuleConfig{
+				Dir:       filepath.Join(tmpDir, "ValidConfigWithEmptyIgnores"),
+				TargetDir: "/home/user/.config/nvim",
+				Ignores:   []string{},
+			},
+			wantErr: false,
+		},
+		{
+			name: "InvalidIgnoresWithEmptyString",
+			setupFunc: func(t *testing.T, dir string) string {
+				configPath := filepath.Join(dir, "Dotfile")
+				err := os.WriteFile(configPath, []byte(`target_dir: "/home/user/.config/nvim"
+ignores:
+  - "*.log"
+  - ""
+  - "temp/"`), 0644)
+				require.NoError(t, err)
+				return dir
+			},
+			wantConfig:  nil,
+			wantErr:     true,
+			errContains: "ignores[1] cannot be empty",
 		},
 	}
 

@@ -4,7 +4,7 @@ A simple command-line tool to manage your dotfiles.
 
 ## Description
 
-Dot Installer helps you manage your dotfiles by installing, uninstalling, and verifying them based on a configuration file. It creates symbolic links from your dotfiles directory to your home directory, making it easy to keep your dotfiles in a version-controlled repository.
+Dot Installer helps you manage your dotfiles by installing and uninstalling them based on a configuration file. It creates symbolic links from your dotfiles directory to your home directory, making it easy to keep your dotfiles in a version-controlled repository.
 
 ## Why not GNU Stow?
 
@@ -14,7 +14,7 @@ While GNU Stow is a popular tool for managing dotfiles, it has several limitatio
 |---|---|
 | **Directory symlinks** - Stow creates directory-level symlinks, which can lead to software modifications polluting your dotfile repository | **File-only linking** - Only creates file-level symbolic links, preventing accidental pollution of your dotfiles |
 | **No environment-specific configs** - Cannot handle different configurations for different environments (Linux/macOS/work/home) | **Template system** - Supports environment-specific configurations through templating and conditional deployment |
-| **Unreliable uninstallation** - `unstow` cannot accurately track which files were originally installed | **State tracking** - Maintains a manifest of installed files for reliable uninstallation and verification |
+| **Unreliable uninstallation** - `unstow` cannot accurately track which files were originally installed | **State tracking** - Maintains a manifest of installed files for reliable uninstallation |
 
 ## Installation
 
@@ -119,13 +119,6 @@ dotman uninstall
 dotman --debug uninstall
 ```
 
-#### `verify`
-
-The `verify` subcommand checks if symbolic links are correctly set up and reports any issues.
-
-```bash
-dotman verify
-```
 
 #### Getting Help
 
@@ -142,7 +135,6 @@ dotman install --help
 - **Modular Configuration**: Each module has its own `Dotfile` configuration
 - **Safe Installation**: Only creates symbolic links, never overwrites files without warning
 - **Safe Uninstallation**: Only removes links created by dotman
-- **Verification**: Ensures links point to correct sources
 - **Detailed Logging**: Debug mode provides detailed operation information
 
 ## License

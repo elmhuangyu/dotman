@@ -18,7 +18,7 @@ var rootCmd = &cobra.Command{
 	Use:   "dotman",
 	Short: "A dotfile management and installation tool",
 	Long: `dotman is a CLI tool for managing and installing dotfiles.
-It provides commands to install, uninstall, and verify dotfile configurations.`,
+It provides commands to install and uninstall dotfile configurations.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		// Set debug mode if flag is provided
 		if debugFlag {
@@ -50,7 +50,6 @@ func init() {
 	// Add subcommands
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(uninstallCmd)
-	rootCmd.AddCommand(verifyCmd)
 }
 
 // getDotfilesDir returns the dotfiles directory based on flag or default

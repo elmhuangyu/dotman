@@ -9,9 +9,8 @@ import (
 )
 
 var (
-	dryRunFlag     bool
-	forceFlag      bool
-	interactiveFlag bool
+	dryRunFlag bool
+	forceFlag  bool
 )
 
 // installCmd represents the install command
@@ -24,19 +23,8 @@ This command copies and links configuration files to their appropriate locations
 	SilenceErrors: true,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
 		// Validate mutually exclusive flags
-		flagCount := 0
-		if dryRunFlag {
-			flagCount++
-		}
-		if forceFlag {
-			flagCount++
-		}
-		if interactiveFlag {
-			flagCount++
-		}
-
-		if flagCount > 1 {
-			return fmt.Errorf("only one of --dry-run, --force, or --interactive can be used at a time")
+		if dryRunFlag && forceFlag {
+			return fmt.Errorf("only one of --dry-run or --force can be used at a time")
 		}
 
 		return nil
@@ -49,8 +37,6 @@ This command copies and links configuration files to their appropriate locations
 			log.Info().Msg("Running in dry-run mode - no changes will be made")
 		} else if forceFlag {
 			log.Info().Msg("Running in force mode - existing files will be overwritten")
-		} else if interactiveFlag {
-			log.Info().Msg("Running in interactive mode - will prompt for confirmation")
 		}
 
 		dotfilesDir := getDotfilesDir()
@@ -76,5 +62,4 @@ This command copies and links configuration files to their appropriate locations
 func init() {
 	installCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would be installed without making changes")
 	installCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Force installation by overwriting existing files")
-	installCmd.Flags().BoolVarP(&interactiveFlag, "interactive", "i", false, "Prompt before installing each file")
 }

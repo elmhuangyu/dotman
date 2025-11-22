@@ -30,33 +30,38 @@ This command copies and links configuration files to their appropriate locations
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		log := logger.GetLogger()
-
-		// Log which mode we're running in
-		if dryRunFlag {
-			log.Info().Msg("Running in dry-run mode - no changes will be made")
-		} else if forceFlag {
-			log.Info().Msg("Running in force mode - existing files will be overwritten")
-		}
-
 		dotfilesDir := getDotfilesDir()
-		log.Info().Str("dotfiles_dir", dotfilesDir).Msg("Loading configuration")
-
-		cfg, err := config.LoadDir(dotfilesDir)
-		if err != nil {
-			return err
-		}
-
-		log.Info().Int("modules", len(cfg.Modules)).Msg("Configuration loaded successfully")
-
-		// TODO: Implement installation logic using cfg.Modules with the new flags
-		for _, module := range cfg.Modules {
-			log.Info().Str("dir", module.Dir).Str("target_dir", module.TargetDir).Msg("Found module")
-		}
-
-		log.Info().Msg("Install command completed")
-		return nil
+		return install(dotfilesDir, dryRunFlag, forceFlag)
 	},
+}
+
+// install performs the dotfiles installation
+func install(dotfilesDir string, dryRun, force bool) error {
+	log := logger.GetLogger()
+
+	// Log which mode we're running in
+	if dryRun {
+		log.Info().Msg("Running in dry-run mode - no changes will be made")
+	} else if force {
+		log.Info().Msg("Running in force mode - existing files will be overwritten")
+	}
+
+	log.Info().Str("dotfiles_dir", dotfilesDir).Msg("Loading configuration")
+
+	cfg, err := config.LoadDir(dotfilesDir)
+	if err != nil {
+		return err
+	}
+
+	log.Info().Int("modules", len(cfg.Modules)).Msg("Configuration loaded successfully")
+
+	// TODO: Implement installation logic using cfg.Modules with the new flags
+	for _, module := range cfg.Modules {
+		log.Info().Str("dir", module.Dir).Str("target_dir", module.TargetDir).Msg("Found module")
+	}
+
+	log.Info().Msg("Install command completed")
+	return nil
 }
 
 func init() {

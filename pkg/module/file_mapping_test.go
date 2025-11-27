@@ -175,8 +175,8 @@ func TestBuildModuleMapping(t *testing.T) {
 
 	// Check specific mappings
 	expectedTargets := map[string]string{
-		filepath.Join(moduleDir, "file1.txt"):  "/home/user/.config/test/file1.txt",
-		filepath.Join(moduleDir, "file2.txt"):  "/home/user/.config/test/file2.txt",
+		filepath.Join(moduleDir, "file1.txt"):   "/home/user/.config/test/file1.txt",
+		filepath.Join(moduleDir, "file2.txt"):   "/home/user/.config/test/file2.txt",
 		filepath.Join(moduleDir, "config.yaml"): "/home/user/.config/test/config.yaml",
 	}
 

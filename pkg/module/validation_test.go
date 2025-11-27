@@ -316,4 +316,3 @@ func TestValidateInstallation(t *testing.T) {
 		assert.True(t, hasConflict)
 	})
 }
-

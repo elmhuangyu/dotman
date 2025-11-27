@@ -10,9 +10,9 @@ import (
 
 // DryRunResult contains the complete results of a dry run
 type DryRunResult struct {
-	IsValid  bool
-	Summary  string
-	Errors   []string
+	IsValid bool
+	Summary string
+	Errors  []string
 	// Grouped operations by type
 	CreateOperations   []FileOperation
 	SkipOperations     []FileOperation

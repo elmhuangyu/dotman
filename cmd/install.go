@@ -5,6 +5,7 @@ import (
 
 	"github.com/elmhuangyu/dotman/pkg/config"
 	"github.com/elmhuangyu/dotman/pkg/logger"
+	"github.com/elmhuangyu/dotman/pkg/module"
 	"github.com/spf13/cobra"
 )
 
@@ -55,13 +56,28 @@ func install(dotfilesDir string, dryRun, force bool) error {
 
 	log.Info().Int("modules", len(cfg.Modules)).Msg("Configuration loaded successfully")
 
-	// TODO: Implement installation logic using cfg.Modules with the new flags
-	for _, module := range cfg.Modules {
-		log.Info().Str("dir", module.Dir).Str("target_dir", module.TargetDir).Msg("Found module")
-	}
+	if dryRun {
+		// Perform dry-run validation
+		result, err := module.DryRun(cfg.Modules)
+		if err != nil {
+			return fmt.Errorf("dry-run validation failed: %w", err)
+		}
 
-	log.Info().Msg("Install command completed")
-	return nil
+		// Log the results
+		module.LogDryRunResults(result)
+
+		// Return error if validation failed
+		if !result.IsValid {
+			return fmt.Errorf("dry-run validation failed with %d errors and %d conflicts", len(result.Errors), len(result.ConflictOperations))
+		}
+
+		log.Info().Msg("Dry-run completed successfully - no changes were made")
+		return nil
+	} else {
+		// TODO: Implement actual installation logic
+		log.Info().Msg("Installation logic not yet implemented")
+		return fmt.Errorf("actual installation is not yet implemented - use --dry-run to validate configuration")
+	}
 }
 
 func init() {

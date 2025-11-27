@@ -148,8 +148,11 @@ func validateDirectoryStructure(dir string) error {
 		// Check if path exists
 		info, err := os.Lstat(current)
 		if os.IsNotExist(err) {
-			// Directory doesn't exist, continue checking parent directories
-			// Move to parent directory and continue the loop
+			// For the target directory itself, it must exist
+			if current == dir {
+				return fmt.Errorf("target directory does not exist: %s", current)
+			}
+			// For parent directories, continue checking
 			parent := filepath.Dir(current)
 			if parent == current {
 				break // We've reached the root

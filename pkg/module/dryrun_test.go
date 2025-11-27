@@ -25,10 +25,15 @@ func TestDryRun(t *testing.T) {
 		err = os.WriteFile(sourceFile2, []byte("content2"), 0644)
 		require.NoError(t, err)
 
+		// Create target directory (this should exist for successful validation)
+		targetDir := filepath.Join(tempDir, "target")
+		err = os.MkdirAll(targetDir, 0755)
+		require.NoError(t, err)
+
 		// Create module config
 		module := config.ModuleConfig{
 			Dir:       sourceDir,
-			TargetDir: filepath.Join(tempDir, "target"),
+			TargetDir: targetDir,
 		}
 
 		result, err := DryRun([]config.ModuleConfig{module})

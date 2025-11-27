@@ -121,7 +121,8 @@ func TestValidateTargetDirectories(t *testing.T) {
 		}
 
 		errors := ValidateTargetDirectories([]config.ModuleConfig{module})
-		assert.Empty(t, errors) // Non-existent directories are OK
+		assert.NotEmpty(t, errors) // Non-existent directories should fail
+		assert.Contains(t, errors[0], "target directory does not exist")
 	})
 
 	t.Run("target is a symlink", func(t *testing.T) {
@@ -153,6 +154,11 @@ func TestValidateTargetDirectories(t *testing.T) {
 		targetDir := filepath.Join(linkDir, "subdir")
 
 		err := os.MkdirAll(realDir, 0755)
+		require.NoError(t, err)
+
+		// Create the subdir in the real directory so the target exists
+		subDir := filepath.Join(realDir, "subdir")
+		err = os.MkdirAll(subDir, 0755)
 		require.NoError(t, err)
 
 		// Remove the existing file if it exists
@@ -187,7 +193,8 @@ func TestValidateDirectoryStructure(t *testing.T) {
 	t.Run("non-existent directory", func(t *testing.T) {
 		nonExistent := filepath.Join(tempDir, "nonexistent", "path")
 		err := validateDirectoryStructure(nonExistent)
-		assert.NoError(t, err) // Non-existent is OK
+		assert.Error(t, err) // Non-existent directories should fail
+		assert.Contains(t, err.Error(), "target directory does not exist")
 	})
 
 	t.Run("directory is a symlink", func(t *testing.T) {
@@ -235,10 +242,15 @@ func TestValidateInstallation(t *testing.T) {
 		err = os.WriteFile(sourceFile2, []byte("content2"), 0644)
 		require.NoError(t, err)
 
+		// Create target directory (must exist for successful validation)
+		targetDir := filepath.Join(tempDir, "target")
+		err = os.MkdirAll(targetDir, 0755)
+		require.NoError(t, err)
+
 		// Create module config
 		module := config.ModuleConfig{
 			Dir:       sourceDir,
-			TargetDir: filepath.Join(tempDir, "target"),
+			TargetDir: targetDir,
 		}
 
 		validation, err := ValidateInstallation([]config.ModuleConfig{module})
@@ -275,6 +287,9 @@ func TestValidateInstallation(t *testing.T) {
 
 		// Both modules target the same directory
 		targetDir := filepath.Join(tempDir, "target")
+		err = os.MkdirAll(targetDir, 0755)
+		require.NoError(t, err)
+
 		module1 := config.ModuleConfig{
 			Dir:       sourceDir1,
 			TargetDir: targetDir,

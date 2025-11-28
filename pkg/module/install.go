@@ -51,6 +51,8 @@ func Install(modules []config.ModuleConfig) (*InstallResult, error) {
 		return result, nil
 	}
 
+	result.SkippedLinks = validation.SkipOperations
+
 	// Perform the installation
 	for _, operation := range validation.CreateOperations {
 		if err := createSymlink(operation.Source, operation.Target); err != nil {

@@ -138,6 +138,44 @@ ignores:
 			wantErr:     true,
 			errContains: "ignores[1] cannot be empty",
 		},
+		{
+			name: "ValidConfigWithHomeExpansion",
+			setupFunc: func(t *testing.T, dir string) string {
+				configPath := filepath.Join(dir, "Dotfile")
+				err := os.WriteFile(configPath, []byte(`target_dir: "$HOME/.config/nvim"`), 0644)
+				require.NoError(t, err)
+				return dir
+			},
+			wantConfig: func() *ModuleConfig {
+				home, err := os.UserHomeDir()
+				require.NoError(t, err)
+				return &ModuleConfig{
+					Dir:       filepath.Join(tmpDir, "ValidConfigWithHomeExpansion"),
+					TargetDir: filepath.Join(home, ".config", "nvim"),
+					Ignores:   nil,
+				}
+			}(),
+			wantErr: false,
+		},
+		{
+			name: "ValidConfigWithHomeOnly",
+			setupFunc: func(t *testing.T, dir string) string {
+				configPath := filepath.Join(dir, "Dotfile")
+				err := os.WriteFile(configPath, []byte(`target_dir: "$HOME"`), 0644)
+				require.NoError(t, err)
+				return dir
+			},
+			wantConfig: func() *ModuleConfig {
+				home, err := os.UserHomeDir()
+				require.NoError(t, err)
+				return &ModuleConfig{
+					Dir:       filepath.Join(tmpDir, "ValidConfigWithHomeOnly"),
+					TargetDir: home,
+					Ignores:   nil,
+				}
+			}(),
+			wantErr: false,
+		},
 	}
 
 	for _, tt := range tests {

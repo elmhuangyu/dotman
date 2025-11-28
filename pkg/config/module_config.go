@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/goccy/go-yaml"
 )
@@ -50,6 +51,15 @@ func LoadConfig(moduleDir string) (*ModuleConfig, error) {
 func (config *ModuleConfig) validate() error {
 	if config.TargetDir == "" {
 		return fmt.Errorf("target_dir field is required")
+	}
+
+	// Expand $HOME if present
+	if strings.HasPrefix(config.TargetDir, "$HOME") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("failed to get home directory: %w", err)
+		}
+		config.TargetDir = strings.Replace(config.TargetDir, "$HOME", home, 1)
 	}
 
 	// target_dir must be an absolute path

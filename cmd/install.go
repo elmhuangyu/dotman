@@ -56,11 +56,11 @@ func install(dotfilesDir string, dryRun, force bool) error {
 
 	log.Info().Int("modules", len(cfg.Modules)).Msg("Configuration loaded successfully")
 
-	if dryRun {
+	if !force {
 		// Perform dry-run validation
 		result, err := module.Validate(cfg.Modules)
 		if err != nil {
-			return fmt.Errorf("dry-run validation failed: %w", err)
+			return fmt.Errorf("validation failed: %w", err)
 		}
 
 		// Log the results
@@ -68,16 +68,17 @@ func install(dotfilesDir string, dryRun, force bool) error {
 
 		// Return error if validation failed
 		if !result.IsValid {
-			return fmt.Errorf("dry-run validation failed with %d errors and %d conflicts", len(result.Errors), len(result.ConflictOperations))
+			return fmt.Errorf("validation failed with %d errors and %d conflicts", len(result.Errors), len(result.ConflictOperations))
 		}
 
-		log.Info().Msg("Dry-run completed successfully - no changes were made")
-		return nil
-	} else {
-		// TODO: Implement actual installation logic
-		log.Info().Msg("Installation logic not yet implemented")
-		return fmt.Errorf("actual installation is not yet implemented - use --dry-run to validate configuration")
+		if dryRun {
+			log.Info().Msg("Dry-run completed successfully - no changes were made")
+			return nil
+		}
 	}
+	// TODO: Implement actual installation logic
+	log.Info().Msg("Installation logic not yet implemented")
+	return fmt.Errorf("actual installation is not yet implemented - use --dry-run to validate configuration")
 }
 
 func init() {

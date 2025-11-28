@@ -19,13 +19,13 @@ type InstallResult struct {
 }
 
 // Install performs the actual installation of dotfiles by creating symlinks
-func Install(modules []config.ModuleConfig) (*InstallResult, error) {
+func Install(modules []config.ModuleConfig, mkdir bool) (*InstallResult, error) {
 	log := logger.GetLogger()
 
 	log.Info().Int("modules", len(modules)).Msg("Starting installation")
 
 	// First validate the installation
-	validation, err := Validate(modules)
+	validation, err := Validate(modules, mkdir)
 	if err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
@@ -55,7 +55,7 @@ func Install(modules []config.ModuleConfig) (*InstallResult, error) {
 
 	// Perform the installation
 	for _, operation := range validation.CreateOperations {
-		if err := createSymlink(operation.Source, operation.Target); err != nil {
+		if err := createSymlink(operation.Source, operation.Target, mkdir); err != nil {
 			result.IsSuccess = false
 			result.Errors = append(result.Errors, fmt.Sprintf("failed to create symlink %s -> %s: %v", operation.Source, operation.Target, err))
 		}
@@ -80,11 +80,18 @@ func Install(modules []config.ModuleConfig) (*InstallResult, error) {
 }
 
 // createSymlink creates a symlink from source to target
-func createSymlink(source, target string) error {
+func createSymlink(source, target string, mkdir bool) error {
 	// Ensure target directory exists
 	targetDir := filepath.Dir(target)
 	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-		return fmt.Errorf("target directory does not exist: %s", targetDir)
+		if mkdir {
+			// Create missing directories
+			if err := os.MkdirAll(targetDir, 0755); err != nil {
+				return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
+			}
+		} else {
+			return fmt.Errorf("target directory does not exist: %s", targetDir)
+		}
 	}
 
 	// Get absolute path for source

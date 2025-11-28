@@ -12,6 +12,7 @@ import (
 var (
 	dryRunFlag bool
 	forceFlag  bool
+	mkdirFlag  bool
 )
 
 // installCmd represents the install command
@@ -32,18 +33,19 @@ This command copies and links configuration files to their appropriate locations
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dotfilesDir := getDotfilesDir()
-		return install(dotfilesDir, dryRunFlag, forceFlag)
+		return install(dotfilesDir, dryRunFlag, forceFlag, mkdirFlag)
 	},
 }
 
 // install performs the dotfiles installation
-func install(dotfilesDir string, dryRun, force bool) error {
+func install(dotfilesDir string, dryRun, force, mkdir bool) error {
 	log := logger.GetLogger()
 
 	// Log which mode we're running in
 	if dryRun {
 		log.Info().Msg("Running in dry-run mode - no changes will be made")
 	} else if force {
+		mkdir = true
 		log.Info().Msg("Running in force mode - existing files will be overwritten")
 	}
 
@@ -58,7 +60,7 @@ func install(dotfilesDir string, dryRun, force bool) error {
 
 	// Perform dry-run validation
 	if dryRun {
-		result, err := module.Validate(cfg.Modules)
+		result, err := module.Validate(cfg.Modules, mkdir)
 		if err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
@@ -76,7 +78,7 @@ func install(dotfilesDir string, dryRun, force bool) error {
 	}
 
 	// Perform installation, module.Install will also call validate
-	installResult, err := module.Install(cfg.Modules)
+	installResult, err := module.Install(cfg.Modules, mkdir)
 	if err != nil {
 		return fmt.Errorf("installation failed: %w", err)
 	}
@@ -94,4 +96,5 @@ func install(dotfilesDir string, dryRun, force bool) error {
 func init() {
 	installCmd.Flags().BoolVar(&dryRunFlag, "dry-run", false, "Show what would be installed without making changes")
 	installCmd.Flags().BoolVarP(&forceFlag, "force", "f", false, "Force installation by overwriting existing files")
+	installCmd.Flags().BoolVar(&mkdirFlag, "mkdir", false, "Create missing target directories during installation")
 }

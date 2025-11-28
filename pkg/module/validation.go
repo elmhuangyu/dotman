@@ -123,12 +123,12 @@ func validateFileMapping(source, target string) (FileOperation, error) {
 }
 
 // ValidateTargetDirectories ensures all target directories and their parents are valid
-func ValidateTargetDirectories(modules []config.ModuleConfig) []string {
+func ValidateTargetDirectories(modules []config.ModuleConfig, mkdir bool) []string {
 	var errors []string
 
 	for _, module := range modules {
 		// Validate target directory structure
-		if err := validateDirectoryStructure(module.TargetDir); err != nil {
+		if err := validateDirectoryStructure(module.TargetDir, mkdir); err != nil {
 			errors = append(errors, fmt.Sprintf("module %s: %v", module.Dir, err))
 		}
 	}
@@ -137,7 +137,7 @@ func ValidateTargetDirectories(modules []config.ModuleConfig) []string {
 }
 
 // validateDirectoryStructure validates that a directory and all its parents are directories, not symlinks
-func validateDirectoryStructure(dir string) error {
+func validateDirectoryStructure(dir string, mkdir bool) error {
 	// Start from the target directory and go up to root
 	current := dir
 	for {
@@ -148,8 +148,12 @@ func validateDirectoryStructure(dir string) error {
 		// Check if path exists
 		info, err := os.Lstat(current)
 		if os.IsNotExist(err) {
-			// For the target directory itself, it must exist
+			// For the target directory itself, it must exist unless mkdir is enabled
 			if current == dir {
+				if mkdir {
+					// With mkdir enabled, missing target directory is allowed
+					break
+				}
 				return fmt.Errorf("target directory does not exist: %s", current)
 			}
 			// For parent directories, continue checking

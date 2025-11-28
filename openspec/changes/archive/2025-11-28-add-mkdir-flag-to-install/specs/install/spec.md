@@ -1,8 +1,6 @@
-# install Specification
+# install Specification Delta
 
-## Purpose
-TBD - created by archiving change implement-install-execution. Update Purpose after archive.
-## Requirements
+## MODIFIED Requirements
 ### Requirement: Install Execution
 The system SHALL create symlinks from source dotfiles to target locations when running the install command without --dry-run.
 
@@ -18,6 +16,7 @@ The system SHALL create symlinks from source dotfiles to target locations when r
 - **AND** not create any symlinks
 - **AND** report the missing directories
 
+## ADDED Requirements
 ### Requirement: --mkdir Flag Support
 The install command SHALL support a `--mkdir` flag to automatically create missing target directories.
 
@@ -42,4 +41,3 @@ The install command SHALL support a `--mkdir` flag to automatically create missi
 - **AND** stop the installation process
 - **AND** report the specific directory creation failure</content>
 <parameter name="filePath">/home/chao/src/dotman/openspec/changes/add-mkdir-flag-to-install/specs/install/spec.md
-

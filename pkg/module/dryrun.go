@@ -22,7 +22,7 @@ type ValidateResult struct {
 }
 
 // Validate performs a complete dry-run validation and returns structured results
-func Validate(modules []config.ModuleConfig) (*ValidateResult, error) {
+func Validate(modules []config.ModuleConfig, mkdir bool) (*ValidateResult, error) {
 	log := logger.GetLogger()
 
 	log.Info().Int("modules", len(modules)).Msg("Starting validation")
@@ -35,7 +35,7 @@ func Validate(modules []config.ModuleConfig) (*ValidateResult, error) {
 	log.Debug().Str("modules", strings.Join(moduleNames, ", ")).Msg("Processing modules")
 
 	// Validate target directories first
-	dirErrors := ValidateTargetDirectories(modules)
+	dirErrors := ValidateTargetDirectories(modules, mkdir)
 	if len(dirErrors) > 0 {
 		return &ValidateResult{
 			IsValid: false,

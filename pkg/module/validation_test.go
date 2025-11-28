@@ -108,7 +108,7 @@ func TestValidateTargetDirectories(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		errors := ValidateTargetDirectories([]config.ModuleConfig{module})
+		errors := ValidateTargetDirectories([]config.ModuleConfig{module}, false)
 		assert.Empty(t, errors)
 	})
 
@@ -120,7 +120,7 @@ func TestValidateTargetDirectories(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		errors := ValidateTargetDirectories([]config.ModuleConfig{module})
+		errors := ValidateTargetDirectories([]config.ModuleConfig{module}, false)
 		assert.NotEmpty(t, errors) // Non-existent directories should fail
 		assert.Contains(t, errors[0], "target directory does not exist")
 	})
@@ -143,7 +143,7 @@ func TestValidateTargetDirectories(t *testing.T) {
 			TargetDir: linkDir,
 		}
 
-		errors := ValidateTargetDirectories([]config.ModuleConfig{module})
+		errors := ValidateTargetDirectories([]config.ModuleConfig{module}, false)
 		assert.NotEmpty(t, errors)
 		assert.Contains(t, errors[0], "is a symlink")
 	})
@@ -172,9 +172,21 @@ func TestValidateTargetDirectories(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		errors := ValidateTargetDirectories([]config.ModuleConfig{module})
+		errors := ValidateTargetDirectories([]config.ModuleConfig{module}, false)
 		assert.NotEmpty(t, errors)
 		assert.Contains(t, errors[0], "is a symlink")
+	})
+
+	t.Run("target directory does not exist but mkdir is true", func(t *testing.T) {
+		targetDir := filepath.Join(tempDir, "mkdir_target")
+
+		module := config.ModuleConfig{
+			Dir:       filepath.Join(tempDir, "module"),
+			TargetDir: targetDir,
+		}
+
+		errors := ValidateTargetDirectories([]config.ModuleConfig{module}, true)
+		assert.Empty(t, errors) // Should not fail when mkdir is true
 	})
 }
 
@@ -186,13 +198,13 @@ func TestValidateDirectoryStructure(t *testing.T) {
 		err := os.MkdirAll(dir, 0755)
 		require.NoError(t, err)
 
-		err = validateDirectoryStructure(dir)
+		err = validateDirectoryStructure(dir, false)
 		assert.NoError(t, err)
 	})
 
 	t.Run("non-existent directory", func(t *testing.T) {
 		nonExistent := filepath.Join(tempDir, "nonexistent", "path")
-		err := validateDirectoryStructure(nonExistent)
+		err := validateDirectoryStructure(nonExistent, false)
 		assert.Error(t, err) // Non-existent directories should fail
 		assert.Contains(t, err.Error(), "target directory does not exist")
 	})
@@ -210,7 +222,7 @@ func TestValidateDirectoryStructure(t *testing.T) {
 		err = os.Symlink(realDir, linkDir)
 		require.NoError(t, err)
 
-		err = validateDirectoryStructure(linkDir)
+		err = validateDirectoryStructure(linkDir, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is a symlink")
 	})
@@ -220,9 +232,16 @@ func TestValidateDirectoryStructure(t *testing.T) {
 		err := os.WriteFile(file, []byte("content"), 0644)
 		require.NoError(t, err)
 
-		err = validateDirectoryStructure(file)
+		err = validateDirectoryStructure(file, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a directory")
+	})
+
+	t.Run("non-existent directory with mkdir true", func(t *testing.T) {
+		nonExistent := filepath.Join(tempDir, "mkdir", "path")
+
+		err := validateDirectoryStructure(nonExistent, true)
+		assert.NoError(t, err) // Should not fail when mkdir is true
 	})
 }
 

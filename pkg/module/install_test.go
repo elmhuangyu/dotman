@@ -47,7 +47,7 @@ func TestInstall(t *testing.T) {
 		os.RemoveAll(targetDir)
 		os.MkdirAll(targetDir, 0755)
 
-		result, err := Install(modules)
+		result, err := Install(modules, false)
 		require.NoError(t, err)
 		assert.True(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 2)
@@ -91,7 +91,7 @@ func TestInstall(t *testing.T) {
 		err = os.Symlink(sourceFile2, targetFile2)
 		require.NoError(t, err)
 
-		result, err := Install(modules)
+		result, err := Install(modules, false)
 		require.NoError(t, err)
 		assert.True(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 0)
@@ -111,7 +111,7 @@ func TestInstall(t *testing.T) {
 		err := os.WriteFile(targetFile1, []byte("existing file"), 0644)
 		require.NoError(t, err)
 
-		result, err := Install(modules)
+		result, err := Install(modules, false)
 		require.NoError(t, err)
 		assert.False(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 0)
@@ -131,12 +131,41 @@ func TestInstall(t *testing.T) {
 			},
 		}
 
-		result, err := Install(nestedModules)
+		result, err := Install(nestedModules, false)
 		require.NoError(t, err)
 		assert.False(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 0)
 		assert.Len(t, result.Errors, 1) // Stops on first error
 		assert.Contains(t, result.Summary, "Installation failed")
+	})
+
+	t.Run("succeed when target directory does not exist and mkdir is true", func(t *testing.T) {
+		// Use nested target directory that doesn't exist
+		mkdirTargetDir := filepath.Join(tempDir, "mkdir", "nested", "target")
+		mkdirModules := []config.ModuleConfig{
+			{
+				Dir:       moduleDir,
+				TargetDir: mkdirTargetDir,
+				Ignores:   []string{},
+			},
+		}
+
+		result, err := Install(mkdirModules, true)
+		require.NoError(t, err)
+		assert.True(t, result.IsSuccess)
+		assert.Len(t, result.CreatedLinks, 2)
+		assert.Len(t, result.SkippedLinks, 0)
+		assert.Len(t, result.Errors, 0)
+		assert.Contains(t, result.Summary, "2 symlinks created")
+
+		// Verify directories were created
+		assert.DirExists(t, mkdirTargetDir)
+
+		// Verify symlinks were created
+		targetFile1 := filepath.Join(mkdirTargetDir, "file1.txt")
+		targetFile2 := filepath.Join(mkdirTargetDir, "file2.txt")
+		assert.FileExists(t, targetFile1)
+		assert.FileExists(t, targetFile2)
 	})
 }
 
@@ -150,7 +179,7 @@ func TestCreateSymlink(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("create symlink successfully", func(t *testing.T) {
-		err := createSymlink(sourceFile, targetFile)
+		err := createSymlink(sourceFile, targetFile, false)
 		require.NoError(t, err)
 
 		// Verify symlink exists and points to correct file using absolute path
@@ -167,8 +196,28 @@ func TestCreateSymlink(t *testing.T) {
 	t.Run("fail when target directory does not exist", func(t *testing.T) {
 		nestedTarget := filepath.Join(tempDir, "nested", "dir", "target.txt")
 
-		err := createSymlink(sourceFile, nestedTarget)
+		err := createSymlink(sourceFile, nestedTarget, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "target directory does not exist")
+	})
+
+	t.Run("create directories when mkdir is true", func(t *testing.T) {
+		nestedTarget := filepath.Join(tempDir, "mkdir", "nested", "dir", "target.txt")
+
+		err := createSymlink(sourceFile, nestedTarget, true)
+		require.NoError(t, err)
+
+		// Verify symlink was created
+		assert.FileExists(t, nestedTarget)
+		linkTarget, err := os.Readlink(nestedTarget)
+		require.NoError(t, err)
+
+		absSource, err := filepath.Abs(sourceFile)
+		require.NoError(t, err)
+		assert.Equal(t, absSource, linkTarget)
+
+		// Verify directories were created
+		nestedDir := filepath.Join(tempDir, "mkdir", "nested", "dir")
+		assert.DirExists(t, nestedDir)
 	})
 }

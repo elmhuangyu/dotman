@@ -36,7 +36,7 @@ func TestDryRun(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		result, err := Validate([]config.ModuleConfig{module})
+		result, err := Validate([]config.ModuleConfig{module}, false)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -81,7 +81,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, moduleConfig)
 
-		result, err := Validate([]config.ModuleConfig{*moduleConfig})
+		result, err := Validate([]config.ModuleConfig{*moduleConfig}, false)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -125,7 +125,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, moduleConfig)
 
-		result, err := Validate([]config.ModuleConfig{*moduleConfig})
+		result, err := Validate([]config.ModuleConfig{*moduleConfig}, false)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -172,7 +172,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, moduleConfig)
 
-		result, err := Validate([]config.ModuleConfig{*moduleConfig})
+		result, err := Validate([]config.ModuleConfig{*moduleConfig}, false)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -186,6 +186,44 @@ func TestDryRun(t *testing.T) {
 		assert.Contains(t, result.Summary, "2 total file operations")
 		assert.Contains(t, result.Summary, "1 files would be linked")
 		assert.Contains(t, result.Summary, "1 conflicts found")
+	})
+
+	t.Run("dry run with missing target directory and mkdir enabled", func(t *testing.T) {
+		// Create source files
+		tempDir := t.TempDir()
+		sourceDir := filepath.Join(tempDir, "source")
+		err := os.MkdirAll(sourceDir, 0755)
+		require.NoError(t, err)
+
+		sourceFile1 := filepath.Join(sourceDir, "file1.txt")
+		sourceFile2 := filepath.Join(sourceDir, "file2.txt")
+		err = os.WriteFile(sourceFile1, []byte("content1"), 0644)
+		require.NoError(t, err)
+		err = os.WriteFile(sourceFile2, []byte("content2"), 0644)
+		require.NoError(t, err)
+
+		// Use target directory that doesn't exist
+		targetDir := filepath.Join(tempDir, "missing", "target", "dir")
+
+		// Create module config
+		module := config.ModuleConfig{
+			Dir:       sourceDir,
+			TargetDir: targetDir,
+		}
+
+		result, err := Validate([]config.ModuleConfig{module}, true)
+		require.NoError(t, err)
+		require.NotNil(t, result)
+
+		assert.True(t, result.IsValid)
+		assert.Empty(t, result.Errors)
+		assert.Len(t, result.CreateOperations, 2)
+		assert.Empty(t, result.SkipOperations)
+		assert.Empty(t, result.ConflictOperations)
+
+		// Check summary
+		assert.Contains(t, result.Summary, "2 total file operations")
+		assert.Contains(t, result.Summary, "2 files would be linked")
 	})
 }
 
@@ -277,7 +315,7 @@ func TestDryRunWithComplexSetup(t *testing.T) {
 		TargetDir: targetDir2,
 	}
 
-	result, err := Validate([]config.ModuleConfig{module1, module2})
+	result, err := Validate([]config.ModuleConfig{module1, module2}, false)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -313,7 +351,7 @@ func TestDryRunLogOutput(t *testing.T) {
 		TargetDir: targetDir,
 	}
 
-	result, err := Validate([]config.ModuleConfig{module})
+	result, err := Validate([]config.ModuleConfig{module}, false)
 	require.NoError(t, err)
 
 	// This should not panic

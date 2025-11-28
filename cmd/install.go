@@ -58,13 +58,13 @@ func install(dotfilesDir string, dryRun, force bool) error {
 
 	if dryRun {
 		// Perform dry-run validation
-		result, err := module.DryRun(cfg.Modules)
+		result, err := module.Validate(cfg.Modules)
 		if err != nil {
 			return fmt.Errorf("dry-run validation failed: %w", err)
 		}
 
 		// Log the results
-		module.LogDryRunResults(result)
+		module.LogValidateResult(result)
 
 		// Return error if validation failed
 		if !result.IsValid {

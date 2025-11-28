@@ -2,14 +2,16 @@ package module
 
 import (
 	"fmt"
+	"path/filepath"
 	"sort"
+	"strings"
 
 	"github.com/elmhuangyu/dotman/pkg/config"
 	"github.com/elmhuangyu/dotman/pkg/logger"
 )
 
-// DryRunResult contains the complete results of a dry run
-type DryRunResult struct {
+// ValidateResult contains the complete results of a dry run
+type ValidateResult struct {
 	IsValid bool
 	Summary string
 	Errors  []string
@@ -19,16 +21,23 @@ type DryRunResult struct {
 	ConflictOperations []FileOperation
 }
 
-// DryRun performs a complete dry-run validation and returns structured results
-func DryRun(modules []config.ModuleConfig) (*DryRunResult, error) {
+// Validate performs a complete dry-run validation and returns structured results
+func Validate(modules []config.ModuleConfig) (*ValidateResult, error) {
 	log := logger.GetLogger()
 
-	log.Info().Int("modules", len(modules)).Msg("Starting dry-run validation")
+	log.Info().Int("modules", len(modules)).Msg("Starting validation")
+
+	// Debug log all module names
+	moduleNames := make([]string, len(modules))
+	for i, module := range modules {
+		_, moduleNames[i] = filepath.Split(module.Dir)
+	}
+	log.Debug().Str("modules", strings.Join(moduleNames, ", ")).Msg("Processing modules")
 
 	// Validate target directories first
 	dirErrors := ValidateTargetDirectories(modules)
 	if len(dirErrors) > 0 {
-		return &DryRunResult{
+		return &ValidateResult{
 			IsValid: false,
 			Errors:  dirErrors,
 		}, nil
@@ -41,7 +50,7 @@ func DryRun(modules []config.ModuleConfig) (*DryRunResult, error) {
 	}
 
 	// Group operations by type
-	result := &DryRunResult{
+	result := &ValidateResult{
 		IsValid: validation.IsValid,
 		Errors:  validation.Errors,
 	}
@@ -68,9 +77,9 @@ func DryRun(modules []config.ModuleConfig) (*DryRunResult, error) {
 	}
 
 	// Generate summary
-	result.Summary = generateDryRunSummary(result)
+	result.Summary = generateValidationSummary(result)
 
-	log.Info().Bool("valid", result.IsValid).Msg("Dry-run validation completed")
+	log.Info().Bool("valid", result.IsValid).Msg("Validation completed")
 
 	return result, nil
 }
@@ -82,11 +91,11 @@ func sortFileOperations(ops []FileOperation) {
 	})
 }
 
-// generateDryRunSummary creates a human-readable summary of the dry-run results
-func generateDryRunSummary(result *DryRunResult) string {
+// generateValidationSummary creates a human-readable summary of the validation results
+func generateValidationSummary(result *ValidateResult) string {
 	totalOps := len(result.CreateOperations) + len(result.SkipOperations) + len(result.ConflictOperations)
 
-	summary := fmt.Sprintf("Dry-run Summary: %d total file operations\n", totalOps)
+	summary := fmt.Sprintf("Validation Summary: %d total file operations\n", totalOps)
 
 	if len(result.CreateOperations) > 0 {
 		summary += fmt.Sprintf("  • %d files would be linked (new symlinks)\n", len(result.CreateOperations))
@@ -107,8 +116,8 @@ func generateDryRunSummary(result *DryRunResult) string {
 	return summary
 }
 
-// LogDryRunResults logs the dry-run results in a structured format
-func LogDryRunResults(result *DryRunResult) {
+// LogValidateResult logs the validation results in a structured format
+func LogValidateResult(result *ValidateResult) {
 	log := logger.GetLogger()
 
 	// Log summary

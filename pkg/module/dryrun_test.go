@@ -36,7 +36,7 @@ func TestDryRun(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		result, err := DryRun([]config.ModuleConfig{module})
+		result, err := Validate([]config.ModuleConfig{module})
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -81,7 +81,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, moduleConfig)
 
-		result, err := DryRun([]config.ModuleConfig{*moduleConfig})
+		result, err := Validate([]config.ModuleConfig{*moduleConfig})
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -125,7 +125,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, moduleConfig)
 
-		result, err := DryRun([]config.ModuleConfig{*moduleConfig})
+		result, err := Validate([]config.ModuleConfig{*moduleConfig})
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -172,7 +172,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, moduleConfig)
 
-		result, err := DryRun([]config.ModuleConfig{*moduleConfig})
+		result, err := Validate([]config.ModuleConfig{*moduleConfig})
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -190,14 +190,14 @@ func TestDryRun(t *testing.T) {
 }
 
 func TestGenerateDryRunSummary(t *testing.T) {
-	result := &DryRunResult{
+	result := &ValidateResult{
 		CreateOperations:   []FileOperation{{Type: OperationCreateLink}},
 		SkipOperations:     []FileOperation{{Type: OperationSkip}, {Type: OperationSkip}, {Type: OperationSkip}},
 		ConflictOperations: []FileOperation{{Type: OperationConflict}},
 		Errors:             []string{"error1"},
 	}
 
-	summary := generateDryRunSummary(result)
+	summary := generateValidationSummary(result)
 
 	assert.Contains(t, summary, "5 total file operations")
 	assert.Contains(t, summary, "1 files would be linked")
@@ -277,7 +277,7 @@ func TestDryRunWithComplexSetup(t *testing.T) {
 		TargetDir: targetDir2,
 	}
 
-	result, err := DryRun([]config.ModuleConfig{module1, module2})
+	result, err := Validate([]config.ModuleConfig{module1, module2})
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -313,11 +313,11 @@ func TestDryRunLogOutput(t *testing.T) {
 		TargetDir: targetDir,
 	}
 
-	result, err := DryRun([]config.ModuleConfig{module})
+	result, err := Validate([]config.ModuleConfig{module})
 	require.NoError(t, err)
 
 	// This should not panic
 	assert.NotPanics(t, func() {
-		LogDryRunResults(result)
+		LogValidateResult(result)
 	})
 }

@@ -22,7 +22,7 @@ type ValidateResult struct {
 }
 
 // Validate performs a complete dry-run validation and returns structured results
-func Validate(modules []config.ModuleConfig, mkdir bool) (*ValidateResult, error) {
+func Validate(modules []config.ModuleConfig, mkdir bool, force bool) (*ValidateResult, error) {
 	log := logger.GetLogger()
 
 	log.Info().Int("modules", len(modules)).Msg("Starting validation")
@@ -71,13 +71,15 @@ func Validate(modules []config.ModuleConfig, mkdir bool) (*ValidateResult, error
 	sortFileOperations(result.SkipOperations)
 	sortFileOperations(result.ConflictOperations)
 
-	// Conflicts make the dry run invalid
-	if len(result.ConflictOperations) > 0 {
+	// Conflicts make the dry run invalid, unless in force mode
+	// In force mode, only module config conflicts (multiple sources to same target) should fail
+	// Target file conflicts (existing files) are allowed in force mode
+	if len(result.ConflictOperations) > 0 && !force {
 		result.IsValid = false
 	}
 
 	// Generate summary
-	result.Summary = generateValidationSummary(result)
+	result.Summary = generateValidationSummary(result, force)
 
 	log.Info().Bool("valid", result.IsValid).Msg("Validation completed")
 
@@ -92,7 +94,7 @@ func sortFileOperations(ops []FileOperation) {
 }
 
 // generateValidationSummary creates a human-readable summary of the validation results
-func generateValidationSummary(result *ValidateResult) string {
+func generateValidationSummary(result *ValidateResult, force bool) string {
 	totalOps := len(result.CreateOperations) + len(result.SkipOperations) + len(result.ConflictOperations)
 
 	summary := fmt.Sprintf("Validation Summary: %d total file operations\n", totalOps)
@@ -105,9 +107,13 @@ func generateValidationSummary(result *ValidateResult) string {
 		summary += fmt.Sprintf("  • %d files skipped (correct symlinks already exist)\n", len(result.SkipOperations))
 	}
 
-	if len(result.ConflictOperations) > 0 {
-		summary += fmt.Sprintf("  • %d conflicts found (targets exist as regular files or wrong symlinks)\n", len(result.ConflictOperations))
-	}
+  if len(result.ConflictOperations) > 0 {
+ 		if force {
+ 			summary += fmt.Sprintf("  • %d conflicts found (will be backed up in force mode)\n", len(result.ConflictOperations))
+ 		} else {
+ 			summary += fmt.Sprintf("  • %d conflicts found (targets exist as regular files or wrong symlinks)\n", len(result.ConflictOperations))
+ 		}
+ 	}
 
 	if len(result.Errors) > 0 {
 		summary += fmt.Sprintf("  • %d errors\n", len(result.Errors))

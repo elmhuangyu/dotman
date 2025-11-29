@@ -43,3 +43,41 @@ The install command SHALL support a `--mkdir` flag to automatically create missi
 - **AND** report the specific directory creation failure</content>
 <parameter name="filePath">/home/chao/src/dotman/openspec/changes/add-mkdir-flag-to-install/specs/install/spec.md
 
+### Requirement: --force Flag Support
+The install command SHALL support a `--force` flag to handle conflicting target files by backing them up and proceeding with installation.
+
+#### Scenario: Force flag availability
+- **WHEN** user runs `install --help`
+- **THEN** the system SHALL show the `--force` flag in the help output
+- **AND** describe its purpose as forcing installation by overwriting existing files
+
+#### Scenario: Force flag validation
+- **WHEN** user specifies both `--dry-run` and `--force` flags
+- **THEN** the system SHALL reject the combination with an error
+- **AND** display a message indicating only one of --dry-run or --force can be used
+
+#### Scenario: Module config conflicts in force mode
+- **WHEN** multiple source files map to the same target (module config conflict)
+- **AND** user runs `install --force`
+- **THEN** the system SHALL still fail with an error
+- **AND** not perform any installation
+
+#### Scenario: Target file conflicts in force mode
+- **WHEN** target files exist as regular files or wrong symlinks
+- **AND** user runs `install --force`
+- **THEN** the system SHALL backup existing files with .bak extension
+- **AND** create correct symlinks to replace them
+- **AND** return success when all operations complete
+
+#### Scenario: Backup file naming
+- **WHEN** backing up conflicting files in force mode
+- **THEN** the system SHALL append .bak extension to the original filename
+- **AND** overwrite any existing .bak file if present
+
+#### Scenario: Force mode with mkdir
+- **WHEN** user runs `install --force --mkdir`
+- **THEN** the system SHALL enable both force and mkdir behaviors
+- **AND** create missing directories as needed
+- **AND** backup conflicting files before creating symlinks</content>
+<parameter name="filePath">/home/chao/src/dotman/openspec/changes/implement-force-flag-for-install/specs/install/spec.md
+

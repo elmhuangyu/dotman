@@ -17,12 +17,13 @@ type ValidateResult struct {
 	Errors  []string
 	// Grouped operations by type
 	CreateOperations   []FileOperation
+	CreateTemplateOps  []FileOperation
 	SkipOperations     []FileOperation
 	ConflictOperations []FileOperation
 }
 
 // Validate performs a complete dry-run validation and returns structured results
-func Validate(modules []config.ModuleConfig, mkdir bool, force bool) (*ValidateResult, error) {
+func Validate(modules []config.ModuleConfig, vars map[string]string, mkdir bool, force bool) (*ValidateResult, error) {
 	log := logger.GetLogger()
 
 	log.Info().Int("modules", len(modules)).Msg("Starting validation")
@@ -44,7 +45,7 @@ func Validate(modules []config.ModuleConfig, mkdir bool, force bool) (*ValidateR
 	}
 
 	// Validate file mappings
-	validation, err := ValidateInstallation(modules)
+	validation, err := ValidateInstallation(modules, vars)
 	if err != nil {
 		return nil, fmt.Errorf("validation failed: %w", err)
 	}
@@ -59,6 +60,8 @@ func Validate(modules []config.ModuleConfig, mkdir bool, force bool) (*ValidateR
 		switch op.Type {
 		case OperationCreateLink:
 			result.CreateOperations = append(result.CreateOperations, op)
+		case OperationCreateTemplate:
+			result.CreateTemplateOps = append(result.CreateTemplateOps, op)
 		case OperationSkip:
 			result.SkipOperations = append(result.SkipOperations, op)
 		case OperationConflict:
@@ -68,6 +71,7 @@ func Validate(modules []config.ModuleConfig, mkdir bool, force bool) (*ValidateR
 
 	// Sort operations for consistent output
 	sortFileOperations(result.CreateOperations)
+	sortFileOperations(result.CreateTemplateOps)
 	sortFileOperations(result.SkipOperations)
 	sortFileOperations(result.ConflictOperations)
 
@@ -95,12 +99,16 @@ func sortFileOperations(ops []FileOperation) {
 
 // generateValidationSummary creates a human-readable summary of the validation results
 func generateValidationSummary(result *ValidateResult, force bool) string {
-	totalOps := len(result.CreateOperations) + len(result.SkipOperations) + len(result.ConflictOperations)
+	totalOps := len(result.CreateOperations) + len(result.CreateTemplateOps) + len(result.SkipOperations) + len(result.ConflictOperations)
 
 	summary := fmt.Sprintf("Validation Summary: %d total file operations\n", totalOps)
 
 	if len(result.CreateOperations) > 0 {
 		summary += fmt.Sprintf("  • %d files would be linked (new symlinks)\n", len(result.CreateOperations))
+	}
+
+	if len(result.CreateTemplateOps) > 0 {
+		summary += fmt.Sprintf("  • %d template files would be generated\n", len(result.CreateTemplateOps))
 	}
 
 	if len(result.SkipOperations) > 0 {

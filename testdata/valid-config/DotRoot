@@ -1,0 +1,6 @@
+vars:
+  USER: testuser
+  HOME: /home/testuser
+  SHELL: /bin/bash
+  APPNAME: myapp
+  VERSION: 1.0.0

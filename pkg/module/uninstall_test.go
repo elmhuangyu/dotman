@@ -131,7 +131,7 @@ func TestValidateSymlink(t *testing.T) {
 			Type:   state.TypeLink,
 		}
 
-		result := validateSymlink(fileMapping, logger.GetLogger())
+		result := validateSymlink(fileMapping)
 		assert.True(t, result.IsValid)
 		assert.Empty(t, result.Reason)
 
@@ -146,7 +146,7 @@ func TestValidateSymlink(t *testing.T) {
 			Type:   state.TypeLink,
 		}
 
-		result := validateSymlink(fileMapping, logger.GetLogger())
+		result := validateSymlink(fileMapping)
 		assert.False(t, result.IsValid)
 		assert.Contains(t, result.Reason, "target file does not exist")
 	})
@@ -162,7 +162,7 @@ func TestValidateSymlink(t *testing.T) {
 			Type:   state.TypeLink,
 		}
 
-		result := validateSymlink(fileMapping, logger.GetLogger())
+		result := validateSymlink(fileMapping)
 		assert.False(t, result.IsValid)
 		assert.Contains(t, result.Reason, "target exists but is not a symlink")
 
@@ -184,7 +184,7 @@ func TestValidateSymlink(t *testing.T) {
 			Type:   state.TypeLink,
 		}
 
-		result := validateSymlink(fileMapping, logger.GetLogger())
+		result := validateSymlink(fileMapping)
 		assert.False(t, result.IsValid)
 		assert.Contains(t, result.Reason, "symlink points to")
 
@@ -205,7 +205,7 @@ func TestValidateSymlink(t *testing.T) {
 			Type:   state.TypeLink,
 		}
 
-		result := validateSymlink(fileMapping, logger.GetLogger())
+		result := validateSymlink(fileMapping)
 		assert.True(t, result.IsValid)
 		assert.Empty(t, result.Reason)
 
@@ -227,7 +227,7 @@ func TestRemoveSymlink(t *testing.T) {
 	require.NoError(t, err)
 
 	t.Run("remove existing symlink", func(t *testing.T) {
-		err := removeSymlink(targetFile, logger.GetLogger())
+		err := removeSymlink(targetFile)
 		assert.NoError(t, err)
 
 		// Verify symlink is removed
@@ -235,7 +235,7 @@ func TestRemoveSymlink(t *testing.T) {
 	})
 
 	t.Run("remove non-existent symlink", func(t *testing.T) {
-		err := removeSymlink(filepath.Join(tempDir, "nonexistent.txt"), logger.GetLogger())
+		err := removeSymlink(filepath.Join(tempDir, "nonexistent.txt"))
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "failed to remove symlink")
 	})

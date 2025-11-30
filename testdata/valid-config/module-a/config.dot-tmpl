@@ -1,0 +1,10 @@
+# Example configuration template
+# This file demonstrates template functionality
+
+user_name = "{{.USER}}"
+home_dir = "{{.HOME}}"
+shell = "{{.SHELL}}"
+
+# Custom variables
+app_name = "{{.APPNAME}}"
+version = "{{.VERSION}}"

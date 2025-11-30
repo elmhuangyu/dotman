@@ -15,6 +15,8 @@ type FileMapping struct {
 	sourceToTarget map[string]string
 	// targetToSource maps target file paths to source file paths
 	targetToSource map[string]string
+	// templates maps source template file paths to their target paths
+	templates map[string]string
 }
 
 // ValidationResult contains the results of dry-run validation
@@ -37,9 +39,10 @@ type FileOperation struct {
 type OperationType string
 
 const (
-	OperationCreateLink OperationType = "create_link"
-	OperationConflict   OperationType = "conflict"
-	OperationSkip       OperationType = "skip"
+	OperationCreateLink     OperationType = "create_link"
+	OperationCreateTemplate OperationType = "create_template"
+	OperationConflict       OperationType = "conflict"
+	OperationSkip           OperationType = "skip"
 )
 
 // NewFileMapping creates a new empty FileMapping
@@ -47,6 +50,7 @@ func NewFileMapping() *FileMapping {
 	return &FileMapping{
 		sourceToTarget: make(map[string]string),
 		targetToSource: make(map[string]string),
+		templates:      make(map[string]string),
 	}
 }
 
@@ -54,6 +58,12 @@ func NewFileMapping() *FileMapping {
 func (fm *FileMapping) AddMapping(source, target string) {
 	fm.sourceToTarget[source] = target
 	fm.targetToSource[target] = source
+}
+
+// AddTemplateMapping adds a template source-target mapping to the FileMapping
+func (fm *FileMapping) AddTemplateMapping(source, target string) {
+	fm.AddMapping(source, target)
+	fm.templates[source] = target
 }
 
 // GetTarget returns the target path for a given source path
@@ -97,6 +107,21 @@ func (fm *FileMapping) GetTargetConflicts() map[string][]string {
 	return conflicts
 }
 
+// IsTemplate checks if a source file is a template
+func (fm *FileMapping) IsTemplate(source string) bool {
+	_, exists := fm.templates[source]
+	return exists
+}
+
+// GetTemplateMappings returns all template source-target mappings
+func (fm *FileMapping) GetTemplateMappings() map[string]string {
+	result := make(map[string]string)
+	for source, target := range fm.templates {
+		result[source] = target
+	}
+	return result
+}
+
 // BuildFileMapping creates a FileMapping from all modules in the config
 func BuildFileMapping(modules []config.ModuleConfig) (*FileMapping, error) {
 	mapping := NewFileMapping()
@@ -109,7 +134,11 @@ func BuildFileMapping(modules []config.ModuleConfig) (*FileMapping, error) {
 
 		// Merge module mapping into main mapping
 		for source, target := range moduleMapping.GetAllMappings() {
-			mapping.AddMapping(source, target)
+			if moduleMapping.IsTemplate(source) {
+				mapping.AddTemplateMapping(source, target)
+			} else {
+				mapping.AddMapping(source, target)
+			}
 		}
 	}
 
@@ -144,9 +173,18 @@ func buildModuleMapping(module config.ModuleConfig) (*FileMapping, error) {
 		}
 
 		// Calculate target path
-		targetFile := filepath.Join(module.TargetDir, entry.Name())
+		targetName := entry.Name()
+		if isTemplateFile(entry.Name()) {
+			// Remove .dot-tmpl extension for target filename
+			targetName = strings.TrimSuffix(entry.Name(), ".dot-tmpl")
+		}
+		targetFile := filepath.Join(module.TargetDir, targetName)
 
-		mapping.AddMapping(sourceFile, targetFile)
+		if isTemplateFile(entry.Name()) {
+			mapping.AddTemplateMapping(sourceFile, targetFile)
+		} else {
+			mapping.AddMapping(sourceFile, targetFile)
+		}
 	}
 
 	return mapping, nil
@@ -160,4 +198,9 @@ func isIgnored(filename string, ignores []string) bool {
 		}
 	}
 	return false
+}
+
+// isTemplateFile checks if a file is a template file (.dot-tmpl extension)
+func isTemplateFile(filename string) bool {
+	return strings.HasSuffix(filename, ".dot-tmpl")
 }

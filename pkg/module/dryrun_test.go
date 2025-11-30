@@ -36,7 +36,7 @@ func TestDryRun(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		result, err := Validate([]config.ModuleConfig{module}, false, false)
+		result, err := Validate([]config.ModuleConfig{module}, map[string]string{}, false, false)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -81,7 +81,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, moduleConfig)
 
-		result, err := Validate([]config.ModuleConfig{*moduleConfig}, false, false)
+		result, err := Validate([]config.ModuleConfig{*moduleConfig}, map[string]string{}, false, false)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -125,7 +125,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, moduleConfig)
 
-		result, err := Validate([]config.ModuleConfig{*moduleConfig}, false, false)
+		result, err := Validate([]config.ModuleConfig{*moduleConfig}, map[string]string{}, false, false)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -172,7 +172,7 @@ func TestDryRun(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, moduleConfig)
 
-		result, err := Validate([]config.ModuleConfig{*moduleConfig}, false, false)
+		result, err := Validate([]config.ModuleConfig{*moduleConfig}, map[string]string{}, false, false)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -211,7 +211,7 @@ func TestDryRun(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		result, err := Validate([]config.ModuleConfig{module}, true, false)
+		result, err := Validate([]config.ModuleConfig{module}, map[string]string{}, true, false)
 		require.NoError(t, err)
 		require.NotNil(t, result)
 
@@ -315,7 +315,7 @@ func TestDryRunWithComplexSetup(t *testing.T) {
 		TargetDir: targetDir2,
 	}
 
-	result, err := Validate([]config.ModuleConfig{module1, module2}, false, false)
+	result, err := Validate([]config.ModuleConfig{module1, module2}, map[string]string{}, false, false)
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
@@ -351,7 +351,7 @@ func TestDryRunLogOutput(t *testing.T) {
 		TargetDir: targetDir,
 	}
 
-	result, err := Validate([]config.ModuleConfig{module}, false, false)
+	result, err := Validate([]config.ModuleConfig{module}, map[string]string{}, false, false)
 	require.NoError(t, err)
 
 	// This should not panic

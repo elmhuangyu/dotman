@@ -53,7 +53,7 @@ func TestInstallUninstallCycle(t *testing.T) {
 		os.MkdirAll(targetDir, 0755)
 
 		// Step 1: Install files
-		installResult, err := Install(modules, false, false, dotfilesDir)
+		installResult, err := Install(modules, map[string]string{}, false, false, dotfilesDir)
 		require.NoError(t, err)
 		assert.True(t, installResult.IsSuccess)
 		assert.Len(t, installResult.CreatedLinks, 3)
@@ -123,7 +123,7 @@ func TestInstallUninstallCycle(t *testing.T) {
 		require.NoError(t, err)
 
 		// Step 1: Install (should skip existing symlinks)
-		installResult, err := Install(modules, false, false, dotfilesDir)
+		installResult, err := Install(modules, map[string]string{}, false, false, dotfilesDir)
 		require.NoError(t, err)
 		assert.True(t, installResult.IsSuccess)
 		assert.Len(t, installResult.CreatedLinks, 0)
@@ -175,7 +175,7 @@ func TestInstallUninstallCycle(t *testing.T) {
 		require.NoError(t, err)
 
 		// Step 1: Install with force mode
-		installResult, err := Install(modules, false, true, dotfilesDir)
+		installResult, err := Install(modules, map[string]string{}, false, true, dotfilesDir)
 		require.NoError(t, err)
 		assert.True(t, installResult.IsSuccess)
 		assert.Len(t, installResult.CreatedLinks, 3)
@@ -263,7 +263,7 @@ func TestUninstallWithModifiedSymlinks(t *testing.T) {
 		}
 
 		// Install files first
-		installResult, err := Install(testModules, false, false, dotfilesDir)
+		installResult, err := Install(testModules, map[string]string{}, false, false, dotfilesDir)
 		require.NoError(t, err)
 		assert.True(t, installResult.IsSuccess)
 
@@ -350,7 +350,7 @@ func TestMultipleInstallUninstallCycles(t *testing.T) {
 		targetFile2 := filepath.Join(targetDir, "file2.txt")
 
 		// Cycle 1: Install and uninstall
-		installResult1, err := Install(modules, false, false, dotfilesDir)
+		installResult1, err := Install(modules, map[string]string{}, false, false, dotfilesDir)
 		require.NoError(t, err)
 		assert.True(t, installResult1.IsSuccess)
 		assert.Len(t, installResult1.CreatedLinks, 2)
@@ -367,7 +367,7 @@ func TestMultipleInstallUninstallCycles(t *testing.T) {
 		assert.Len(t, stateFile1.Files, 0)
 
 		// Cycle 2: Install and uninstall again
-		installResult2, err := Install(modules, false, false, dotfilesDir)
+		installResult2, err := Install(modules, map[string]string{}, false, false, dotfilesDir)
 		require.NoError(t, err)
 		assert.True(t, installResult2.IsSuccess)
 		assert.Len(t, installResult2.CreatedLinks, 2)
@@ -395,7 +395,7 @@ func TestMultipleInstallUninstallCycles(t *testing.T) {
 		err = os.Symlink(absSource2, targetFile2)
 		require.NoError(t, err)
 
-		installResult3, err := Install(modules, false, false, dotfilesDir)
+		installResult3, err := Install(modules, map[string]string{}, false, false, dotfilesDir)
 		require.NoError(t, err)
 		assert.True(t, installResult3.IsSuccess)
 		assert.Len(t, installResult3.CreatedLinks, 0)

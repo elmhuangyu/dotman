@@ -42,7 +42,7 @@ func TestInstallWithStateLogging(t *testing.T) {
 		}
 
 		// Run install
-		result, err := Install([]config.ModuleConfig{module}, true, false, tmpDir)
+		result, err := Install([]config.ModuleConfig{module}, map[string]string{}, true, false, tmpDir)
 		require.NoError(t, err)
 		assert.True(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 1)
@@ -94,7 +94,7 @@ func TestInstallWithStateLogging(t *testing.T) {
 		}
 
 		// Run install with force
-		result, err := Install([]config.ModuleConfig{module}, true, true, tmpDir)
+		result, err := Install([]config.ModuleConfig{module}, map[string]string{}, true, true, tmpDir)
 		require.NoError(t, err)
 		assert.True(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 1)
@@ -143,7 +143,7 @@ func TestInstallWithStateLogging(t *testing.T) {
 		}
 
 		// Run install without force (should fail due to conflict)
-		result, err := Install([]config.ModuleConfig{module}, true, false, tmpDir)
+		result, err := Install([]config.ModuleConfig{module}, map[string]string{}, true, false, tmpDir)
 		require.NoError(t, err)
 		assert.False(t, result.IsSuccess)
 

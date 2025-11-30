@@ -22,7 +22,7 @@ func TestValidateFileMapping(t *testing.T) {
 	t.Run("target does not exist", func(t *testing.T) {
 		targetFile := filepath.Join(tempDir, "target.txt")
 
-		operation, err := validateFileMapping(sourceFile, targetFile)
+		operation, err := validateFileMapping(sourceFile, targetFile, false, map[string]string{})
 		require.NoError(t, err)
 		assert.Equal(t, OperationCreateLink, operation.Type)
 		assert.Equal(t, sourceFile, operation.Source)
@@ -36,7 +36,7 @@ func TestValidateFileMapping(t *testing.T) {
 		err := os.Symlink(sourceFile, targetFile)
 		require.NoError(t, err)
 
-		operation, err := validateFileMapping(sourceFile, targetFile)
+		operation, err := validateFileMapping(sourceFile, targetFile, false, map[string]string{})
 		require.NoError(t, err)
 		assert.Equal(t, OperationSkip, operation.Type)
 	})
@@ -53,7 +53,7 @@ func TestValidateFileMapping(t *testing.T) {
 		err = os.Symlink(wrongSource, targetFile)
 		require.NoError(t, err)
 
-		operation, err := validateFileMapping(sourceFile, targetFile)
+		operation, err := validateFileMapping(sourceFile, targetFile, false, map[string]string{})
 		require.NoError(t, err)
 		assert.Equal(t, OperationConflict, operation.Type)
 		assert.Contains(t, operation.Description, "target exists as symlink pointing to wrong file")
@@ -67,7 +67,7 @@ func TestValidateFileMapping(t *testing.T) {
 		err := os.WriteFile(targetFile, []byte("existing content"), 0644)
 		require.NoError(t, err)
 
-		operation, err := validateFileMapping(sourceFile, targetFile)
+		operation, err := validateFileMapping(sourceFile, targetFile, false, map[string]string{})
 		require.NoError(t, err)
 		assert.Equal(t, OperationConflict, operation.Type)
 		assert.Equal(t, "target exists as regular file", operation.Description)
@@ -77,7 +77,7 @@ func TestValidateFileMapping(t *testing.T) {
 		nonExistentSource := filepath.Join(tempDir, "nonexistent.txt")
 		targetFile := filepath.Join(tempDir, "target.txt")
 
-		_, err := validateFileMapping(nonExistentSource, targetFile)
+		_, err := validateFileMapping(nonExistentSource, targetFile, false, map[string]string{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "source file does not exist")
 	})
@@ -89,7 +89,7 @@ func TestValidateFileMapping(t *testing.T) {
 
 		targetFile := filepath.Join(tempDir, "target.txt")
 
-		_, err = validateFileMapping(sourceDir, targetFile)
+		_, err = validateFileMapping(sourceDir, targetFile, false, map[string]string{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "source is a directory")
 	})
@@ -272,7 +272,7 @@ func TestValidateInstallation(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		validation, err := ValidateInstallation([]config.ModuleConfig{module})
+		validation, err := ValidateInstallation([]config.ModuleConfig{module}, map[string]string{})
 		require.NoError(t, err)
 		assert.NotNil(t, validation)
 		assert.True(t, validation.IsValid)
@@ -318,7 +318,7 @@ func TestValidateInstallation(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		validation, err := ValidateInstallation([]config.ModuleConfig{module1, module2})
+		validation, err := ValidateInstallation([]config.ModuleConfig{module1, module2}, map[string]string{})
 		require.NoError(t, err)
 		assert.NotNil(t, validation)
 		assert.False(t, validation.IsValid)

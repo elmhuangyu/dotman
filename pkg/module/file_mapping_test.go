@@ -15,8 +15,10 @@ func TestNewFileMapping(t *testing.T) {
 	assert.NotNil(t, fm)
 	assert.NotNil(t, fm.sourceToTarget)
 	assert.NotNil(t, fm.targetToSource)
+	assert.NotNil(t, fm.templates)
 	assert.Empty(t, fm.sourceToTarget)
 	assert.Empty(t, fm.targetToSource)
+	assert.Empty(t, fm.templates)
 }
 
 func TestFileMappingAddMapping(t *testing.T) {
@@ -35,6 +37,30 @@ func TestFileMappingAddMapping(t *testing.T) {
 	retrievedSource, exists := fm.GetSource(target)
 	assert.True(t, exists)
 	assert.Equal(t, source, retrievedSource)
+
+	// Test that regular files are not templates
+	assert.False(t, fm.IsTemplate(source))
+}
+
+func TestFileMappingAddTemplateMapping(t *testing.T) {
+	fm := NewFileMapping()
+	source := "/source/config.dot-tmpl"
+	target := "/target/config"
+
+	fm.AddTemplateMapping(source, target)
+
+	// Test forward mapping
+	retrievedTarget, exists := fm.GetTarget(source)
+	assert.True(t, exists)
+	assert.Equal(t, target, retrievedTarget)
+
+	// Test reverse mapping
+	retrievedSource, exists := fm.GetSource(target)
+	assert.True(t, exists)
+	assert.Equal(t, source, retrievedSource)
+
+	// Test that template is recognized
+	assert.True(t, fm.IsTemplate(source))
 }
 
 func TestFileMappingGetAllMappings(t *testing.T) {
@@ -54,6 +80,32 @@ func TestFileMappingGetAllMappings(t *testing.T) {
 
 	for source, target := range mappings {
 		retrievedTarget, exists := allMappings[source]
+		assert.True(t, exists)
+		assert.Equal(t, target, retrievedTarget)
+	}
+}
+
+func TestFileMappingGetTemplateMappings(t *testing.T) {
+	fm := NewFileMapping()
+
+	// Add regular mappings
+	fm.AddMapping("/source1.txt", "/target1.txt")
+	fm.AddMapping("/source2.txt", "/target2.txt")
+
+	// Add template mappings
+	fm.AddTemplateMapping("/source3.dot-tmpl", "/target3")
+	fm.AddTemplateMapping("/source4.dot-tmpl", "/target4")
+
+	templateMappings := fm.GetTemplateMappings()
+	assert.Len(t, templateMappings, 2)
+
+	expectedTemplates := map[string]string{
+		"/source3.dot-tmpl": "/target3",
+		"/source4.dot-tmpl": "/target4",
+	}
+
+	for source, target := range expectedTemplates {
+		retrievedTarget, exists := templateMappings[source]
 		assert.True(t, exists)
 		assert.Equal(t, target, retrievedTarget)
 	}
@@ -147,7 +199,7 @@ func TestBuildModuleMapping(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create test files
-	testFiles := []string{"file1.txt", "file2.txt", "config.yaml"}
+	testFiles := []string{"file1.txt", "file2.txt", "config.yaml", "template.dot-tmpl"}
 	for _, file := range testFiles {
 		err := os.WriteFile(filepath.Join(moduleDir, file), []byte("test content"), 0644)
 		require.NoError(t, err)
@@ -171,13 +223,14 @@ func TestBuildModuleMapping(t *testing.T) {
 
 	// Check that all files (except Dotfile) are mapped
 	allMappings := mapping.GetAllMappings()
-	assert.Len(t, allMappings, 3) // 3 test files
+	assert.Len(t, allMappings, 4) // 4 test files
 
 	// Check specific mappings
 	expectedTargets := map[string]string{
-		filepath.Join(moduleDir, "file1.txt"):   "/home/user/.config/test/file1.txt",
-		filepath.Join(moduleDir, "file2.txt"):   "/home/user/.config/test/file2.txt",
-		filepath.Join(moduleDir, "config.yaml"): "/home/user/.config/test/config.yaml",
+		filepath.Join(moduleDir, "file1.txt"):         "/home/user/.config/test/file1.txt",
+		filepath.Join(moduleDir, "file2.txt"):         "/home/user/.config/test/file2.txt",
+		filepath.Join(moduleDir, "config.yaml"):       "/home/user/.config/test/config.yaml",
+		filepath.Join(moduleDir, "template.dot-tmpl"): "/home/user/.config/test/template",
 	}
 
 	for source, expectedTarget := range expectedTargets {
@@ -185,6 +238,14 @@ func TestBuildModuleMapping(t *testing.T) {
 		assert.True(t, exists, "Source file %s should be mapped", source)
 		assert.Equal(t, expectedTarget, target)
 	}
+
+	// Check template detection
+	templateSource := filepath.Join(moduleDir, "template.dot-tmpl")
+	assert.True(t, mapping.IsTemplate(templateSource))
+
+	// Check that regular files are not templates
+	regularSource := filepath.Join(moduleDir, "file1.txt")
+	assert.False(t, mapping.IsTemplate(regularSource))
 }
 
 func TestIsIgnored(t *testing.T) {
@@ -229,6 +290,52 @@ func TestIsIgnored(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			result := isIgnored(test.filename, test.ignores)
+			assert.Equal(t, test.expected, result)
+		})
+	}
+}
+
+func TestIsTemplateFile(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		expected bool
+	}{
+		{
+			name:     "regular file without extension",
+			filename: "config",
+			expected: false,
+		},
+		{
+			name:     "regular file with .txt extension",
+			filename: "config.txt",
+			expected: false,
+		},
+		{
+			name:     "template file with .dot-tmpl extension",
+			filename: "config.dot-tmpl",
+			expected: true,
+		},
+		{
+			name:     "template file with name containing dots",
+			filename: "my.config.dot-tmpl",
+			expected: true,
+		},
+		{
+			name:     "file ending with .tmpl but not .dot-tmpl",
+			filename: "config.tmpl",
+			expected: false,
+		},
+		{
+			name:     "empty filename",
+			filename: "",
+			expected: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := isTemplateFile(test.filename)
 			assert.Equal(t, test.expected, result)
 		})
 	}

@@ -76,9 +76,15 @@ func install(dotfilesDir string, dryRun, force, mkdir bool) error {
 		log.Info().Msg("Starting installation phase")
 	}
 
+	// Ensure vars map is not nil
+	vars := cfg.RootConfig.Vars
+	if vars == nil {
+		vars = make(map[string]string)
+	}
+
 	// Perform dry-run validation
 	if dryRun {
-		result, err := module.Validate(cfg.Modules, mkdir, force)
+		result, err := module.Validate(cfg.Modules, vars, mkdir, force)
 		if err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
@@ -96,7 +102,7 @@ func install(dotfilesDir string, dryRun, force, mkdir bool) error {
 	}
 
 	// Perform installation, module.Install will also call validate
-	installResult, err := module.Install(cfg.Modules, mkdir, force, dotfilesDir)
+	installResult, err := module.Install(cfg.Modules, vars, mkdir, force, dotfilesDir)
 	if err != nil {
 		return fmt.Errorf("installation failed: %w", err)
 	}

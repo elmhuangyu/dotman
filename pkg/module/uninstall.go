@@ -69,7 +69,7 @@ func Uninstall(dotfilesDir string) (*UninstallResult, error) {
 		}
 
 		// Validate symlink before removal
-		validationResult := validateSymlink(fileMapping, log)
+		validationResult := validateSymlink(fileMapping)
 		if !validationResult.IsValid {
 			result.SkippedLinks = append(result.SkippedLinks, OperationResult{
 				Operation: operation,
@@ -80,7 +80,7 @@ func Uninstall(dotfilesDir string) (*UninstallResult, error) {
 		}
 
 		// Remove the symlink
-		if err := removeSymlink(fileMapping.Target, log); err != nil {
+		if err := removeSymlink(fileMapping.Target); err != nil {
 			result.FailedRemovals = append(result.FailedRemovals, OperationResult{
 				Operation: operation,
 				Reason:    err.Error(),
@@ -127,7 +127,7 @@ type SymlinkValidationResult struct {
 }
 
 // validateSymlink validates that a symlink points to the expected source
-func validateSymlink(fileMapping state.FileMapping, log zerolog.Logger) SymlinkValidationResult {
+func validateSymlink(fileMapping state.FileMapping) SymlinkValidationResult {
 	// Check if target exists
 	targetInfo, err := os.Lstat(fileMapping.Target)
 	if err != nil {
@@ -195,7 +195,7 @@ func validateSymlink(fileMapping state.FileMapping, log zerolog.Logger) SymlinkV
 }
 
 // removeSymlink safely removes a symlink
-func removeSymlink(target string, log zerolog.Logger) error {
+func removeSymlink(target string) error {
 	if err := os.Remove(target); err != nil {
 		return fmt.Errorf("failed to remove symlink: %w", err)
 	}

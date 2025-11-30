@@ -9,7 +9,7 @@ import (
 )
 
 // ValidateInstallation performs dry-run validation of the installation
-func ValidateInstallation(modules []config.ModuleConfig) (*ValidationResult, error) {
+func ValidateInstallation(modules []config.ModuleConfig, vars map[string]string) (*ValidationResult, error) {
 	// Build file mappings
 	mapping, err := BuildFileMapping(modules)
 	if err != nil {
@@ -31,7 +31,7 @@ func ValidateInstallation(modules []config.ModuleConfig) (*ValidationResult, err
 
 	// Validate each mapping
 	for source, target := range mapping.GetAllMappings() {
-		operation, err := validateFileMapping(source, target)
+		operation, err := validateFileMapping(source, target, mapping.IsTemplate(source), vars)
 		if err != nil {
 			result.IsValid = false
 			result.Errors = append(result.Errors, fmt.Sprintf("validation error for %s -> %s: %v", source, target, err))
@@ -45,7 +45,7 @@ func ValidateInstallation(modules []config.ModuleConfig) (*ValidationResult, err
 }
 
 // validateFileMapping validates a single source->target mapping
-func validateFileMapping(source, target string) (FileOperation, error) {
+func validateFileMapping(source, target string, isTemplate bool, vars map[string]string) (FileOperation, error) {
 	// Check if source file exists
 	if _, err := os.Stat(source); os.IsNotExist(err) {
 		return FileOperation{}, fmt.Errorf("source file does not exist: %s", source)
@@ -61,18 +61,45 @@ func validateFileMapping(source, target string) (FileOperation, error) {
 		return FileOperation{}, fmt.Errorf("source is a directory, not a file: %s", source)
 	}
 
+	// For templates, validate template syntax and variables
+	if isTemplate {
+		if err := ValidateTemplate(source, vars); err != nil {
+			return FileOperation{}, fmt.Errorf("template validation failed: %w", err)
+		}
+	}
+
 	// Check if target exists
 	targetInfo, err := os.Lstat(target)
 	if os.IsNotExist(err) {
 		// Target doesn't exist, this is a create operation
-		return FileOperation{
-			Type:        OperationCreateLink,
-			Source:      source,
-			Target:      target,
-			Description: "create new symlink",
-		}, nil
+		if isTemplate {
+			return FileOperation{
+				Type:        OperationCreateTemplate,
+				Source:      source,
+				Target:      target,
+				Description: "create new template file",
+			}, nil
+		} else {
+			return FileOperation{
+				Type:        OperationCreateLink,
+				Source:      source,
+				Target:      target,
+				Description: "create new symlink",
+			}, nil
+		}
 	} else if err != nil {
 		return FileOperation{}, fmt.Errorf("failed to stat target %s: %w", target, err)
+	}
+
+	// For templates, we need to check if the target file exists and has correct content
+	// For now, treat existing files as conflicts (will be handled by force mode)
+	if isTemplate {
+		return FileOperation{
+			Type:        OperationConflict,
+			Source:      source,
+			Target:      target,
+			Description: "target exists as file (template would overwrite)",
+		}, nil
 	}
 
 	// Target exists, check if it's a symlink to the correct source

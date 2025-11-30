@@ -58,9 +58,9 @@ func install(dotfilesDir string, dryRun, force, mkdir bool) error {
 
 	log.Info().Int("modules", len(cfg.Modules)).Msg("Configuration loaded successfully")
 
-  // Perform dry-run validation
-  if dryRun {
-    result, err := module.Validate(cfg.Modules, mkdir, force)
+	// Perform dry-run validation
+	if dryRun {
+		result, err := module.Validate(cfg.Modules, mkdir, force)
 		if err != nil {
 			return fmt.Errorf("validation failed: %w", err)
 		}
@@ -77,8 +77,8 @@ func install(dotfilesDir string, dryRun, force, mkdir bool) error {
 		return nil
 	}
 
-  // Perform installation, module.Install will also call validate
-  installResult, err := module.Install(cfg.Modules, mkdir, force)
+	// Perform installation, module.Install will also call validate
+	installResult, err := module.Install(cfg.Modules, mkdir, force, dotfilesDir)
 	if err != nil {
 		return fmt.Errorf("installation failed: %w", err)
 	}

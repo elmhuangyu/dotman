@@ -107,13 +107,13 @@ func generateValidationSummary(result *ValidateResult, force bool) string {
 		summary += fmt.Sprintf("  • %d files skipped (correct symlinks already exist)\n", len(result.SkipOperations))
 	}
 
-  if len(result.ConflictOperations) > 0 {
- 		if force {
- 			summary += fmt.Sprintf("  • %d conflicts found (will be backed up in force mode)\n", len(result.ConflictOperations))
- 		} else {
- 			summary += fmt.Sprintf("  • %d conflicts found (targets exist as regular files or wrong symlinks)\n", len(result.ConflictOperations))
- 		}
- 	}
+	if len(result.ConflictOperations) > 0 {
+		if force {
+			summary += fmt.Sprintf("  • %d conflicts found (will be backed up in force mode)\n", len(result.ConflictOperations))
+		} else {
+			summary += fmt.Sprintf("  • %d conflicts found (targets exist as regular files or wrong symlinks)\n", len(result.ConflictOperations))
+		}
+	}
 
 	if len(result.Errors) > 0 {
 		summary += fmt.Sprintf("  • %d errors\n", len(result.Errors))

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/elmhuangyu/dotman/pkg/config"
+	"github.com/elmhuangyu/dotman/pkg/state"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +48,7 @@ func TestInstall(t *testing.T) {
 		os.RemoveAll(targetDir)
 		os.MkdirAll(targetDir, 0755)
 
-		result, err := Install(modules, false, false)
+		result, err := Install(modules, false, false, "")
 		require.NoError(t, err)
 		assert.True(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 2)
@@ -91,7 +92,7 @@ func TestInstall(t *testing.T) {
 		err = os.Symlink(sourceFile2, targetFile2)
 		require.NoError(t, err)
 
-		result, err := Install(modules, false, false)
+		result, err := Install(modules, false, false, "")
 		require.NoError(t, err)
 		assert.True(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 0)
@@ -111,7 +112,7 @@ func TestInstall(t *testing.T) {
 		err := os.WriteFile(targetFile1, []byte("existing file"), 0644)
 		require.NoError(t, err)
 
-		result, err := Install(modules, false, false)
+		result, err := Install(modules, false, false, "")
 		require.NoError(t, err)
 		assert.False(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 0)
@@ -131,7 +132,7 @@ func TestInstall(t *testing.T) {
 			},
 		}
 
-		result, err := Install(nestedModules, false, false)
+		result, err := Install(nestedModules, false, false, "")
 		require.NoError(t, err)
 		assert.False(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 0)
@@ -150,7 +151,7 @@ func TestInstall(t *testing.T) {
 			},
 		}
 
-		result, err := Install(mkdirModules, true, false)
+		result, err := Install(mkdirModules, true, false, "")
 		require.NoError(t, err)
 		assert.True(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 2)
@@ -207,7 +208,7 @@ func TestInstallForceMode(t *testing.T) {
 	}
 
 	t.Run("force mode backs up existing files and creates symlinks", func(t *testing.T) {
-		result, err := Install(modules, false, true) // force = true
+		result, err := Install(modules, false, true, "") // force = true
 		require.NoError(t, err)
 		assert.True(t, result.IsSuccess)
 		assert.Len(t, result.CreatedLinks, 2)
@@ -351,5 +352,130 @@ func TestBackupAndCreateSymlink(t *testing.T) {
 		backupContent, err := os.ReadFile(backupFile)
 		require.NoError(t, err)
 		assert.Equal(t, "existing content", string(backupContent))
+	})
+}
+
+func TestInstallStateFileHandling(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create test module structure
+	moduleDir := filepath.Join(tempDir, "module")
+	targetDir := filepath.Join(tempDir, "target")
+	dotfilesDir := filepath.Join(tempDir, "dotfiles")
+
+	err := os.MkdirAll(moduleDir, 0755)
+	require.NoError(t, err)
+
+	err = os.MkdirAll(targetDir, 0755)
+	require.NoError(t, err)
+
+	err = os.MkdirAll(dotfilesDir, 0755)
+	require.NoError(t, err)
+
+	// Create test files in module
+	sourceFile1 := filepath.Join(moduleDir, "file1.txt")
+	sourceFile2 := filepath.Join(moduleDir, "file2.txt")
+
+	err = os.WriteFile(sourceFile1, []byte("content1"), 0644)
+	require.NoError(t, err)
+
+	err = os.WriteFile(sourceFile2, []byte("content2"), 0644)
+	require.NoError(t, err)
+
+	// Create module config
+	modules := []config.ModuleConfig{
+		{
+			Dir:       moduleDir,
+			TargetDir: targetDir,
+			Ignores:   []string{},
+		},
+	}
+
+	t.Run("skipped files are recorded in state file", func(t *testing.T) {
+		// Clean target directory
+		os.RemoveAll(targetDir)
+		os.MkdirAll(targetDir, 0755)
+
+		// Pre-create correct symlinks
+		targetFile1 := filepath.Join(targetDir, "file1.txt")
+		targetFile2 := filepath.Join(targetDir, "file2.txt")
+
+		err := os.Symlink(sourceFile1, targetFile1)
+		require.NoError(t, err)
+
+		err = os.Symlink(sourceFile2, targetFile2)
+		require.NoError(t, err)
+
+		// Run installation with state file
+		result, err := Install(modules, false, false, dotfilesDir)
+		require.NoError(t, err)
+		assert.True(t, result.IsSuccess)
+		assert.Len(t, result.SkippedLinks, 2)
+
+		// Check state file contains skipped files
+		statePath := filepath.Join(dotfilesDir, "state.yaml")
+		stateFile, err := state.LoadStateFile(statePath)
+		require.NoError(t, err)
+		require.NotNil(t, stateFile)
+
+		// Verify both skipped files are in state file
+		assert.Len(t, stateFile.Files, 2)
+
+		absSource1, err := filepath.Abs(sourceFile1)
+		require.NoError(t, err)
+		absTarget1, err := filepath.Abs(targetFile1)
+		require.NoError(t, err)
+
+		absSource2, err := filepath.Abs(sourceFile2)
+		require.NoError(t, err)
+		absTarget2, err := filepath.Abs(targetFile2)
+		require.NoError(t, err)
+
+		// Check file mappings
+		found1 := false
+		found2 := false
+		for _, file := range stateFile.Files {
+			if file.Source == absSource1 && file.Target == absTarget1 && file.Type == state.TypeLink {
+				found1 = true
+			}
+			if file.Source == absSource2 && file.Target == absTarget2 && file.Type == state.TypeLink {
+				found2 = true
+			}
+		}
+		assert.True(t, found1, "file1.txt mapping not found in state file")
+		assert.True(t, found2, "file2.txt mapping not found in state file")
+	})
+
+	t.Run("state file avoids duplicates for skipped files", func(t *testing.T) {
+		// Clean target directory
+		os.RemoveAll(targetDir)
+		os.MkdirAll(targetDir, 0755)
+
+		// Pre-create correct symlinks for both files
+		targetFile1 := filepath.Join(targetDir, "file1.txt")
+		targetFile2 := filepath.Join(targetDir, "file2.txt")
+		err := os.Symlink(sourceFile1, targetFile1)
+		require.NoError(t, err)
+		err = os.Symlink(sourceFile2, targetFile2)
+		require.NoError(t, err)
+
+		// Run installation twice to test duplicate handling
+		result1, err := Install(modules, false, false, dotfilesDir)
+		require.NoError(t, err)
+		assert.True(t, result1.IsSuccess)
+		assert.Len(t, result1.SkippedLinks, 2)
+
+		result2, err := Install(modules, false, false, dotfilesDir)
+		require.NoError(t, err)
+		assert.True(t, result2.IsSuccess)
+		assert.Len(t, result2.SkippedLinks, 2)
+
+		// Check state file contains only two entries (no duplicates)
+		statePath := filepath.Join(dotfilesDir, "state.yaml")
+		stateFile, err := state.LoadStateFile(statePath)
+		require.NoError(t, err)
+		require.NotNil(t, stateFile)
+
+		assert.Len(t, stateFile.Files, 2, "state file should not contain duplicate entries")
 	})
 }

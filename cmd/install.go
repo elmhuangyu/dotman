@@ -20,7 +20,10 @@ var installCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Install dotfiles to the system",
 	Long: `Install dotfiles from the configured dotfiles directory to the system.
-This command copies and links configuration files to their appropriate locations.`,
+This command copies and links configuration files to their appropriate locations.
+
+The install command automatically runs a cleanup phase (uninstall) before installation
+to ensure a clean state and prevent conflicts from previous installations.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	PreRunE: func(cmd *cobra.Command, args []string) error {
@@ -57,6 +60,21 @@ func install(dotfilesDir string, dryRun, force, mkdir bool) error {
 	}
 
 	log.Info().Int("modules", len(cfg.Modules)).Msg("Configuration loaded successfully")
+
+	// Run cleanup phase (uninstall) before installation if not in dry-run mode
+	if !dryRun {
+		log.Info().Msg("Running cleanup phase - removing previous installations")
+		uninstallResult, err := module.Uninstall(dotfilesDir)
+		if err != nil {
+			log.Warn().Err(err).Msg("Cleanup phase failed, proceeding with installation")
+		} else {
+			log.Info().Msg("Cleanup phase completed")
+			if uninstallResult != nil {
+				log.Info().Msg(uninstallResult.Summary)
+			}
+		}
+		log.Info().Msg("Starting installation phase")
+	}
 
 	// Perform dry-run validation
 	if dryRun {

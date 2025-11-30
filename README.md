@@ -96,6 +96,8 @@ target_dir: "/home/user/.config/nvim"
 #### `install`
 
 The `install` subcommand creates symbolic links for your dotfiles based on module configurations.
+It automatically runs a cleanup phase (uninstall) before installation to ensure a clean state
+and prevent conflicts from previous installations.
 
 ```bash
 # Basic usage - installs all modules with Dotfile configurations
@@ -106,6 +108,15 @@ dotman --debug install
 
 # With custom dotfiles directory
 dotman --dir /path/to/dotfiles install
+
+# Force installation (overwrite existing files)
+dotman install --force
+
+# Create missing target directories
+dotman install --mkdir
+
+# Dry-run mode (show what would be installed without making changes)
+dotman install --dry-run
 ```
 
 #### `uninstall`

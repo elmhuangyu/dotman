@@ -1,8 +1,10 @@
 package cmd
 
 import (
-	"github.com/elmhuangyu/dotman/pkg/config"
+	"fmt"
+
 	"github.com/elmhuangyu/dotman/pkg/logger"
+	"github.com/elmhuangyu/dotman/pkg/module"
 	"github.com/spf13/cobra"
 )
 
@@ -24,21 +26,51 @@ This command cleans up configuration files installed by the install command.`,
 func uninstall(dotfilesDir string) error {
 	log := logger.GetLogger()
 
-	log.Info().Str("dotfiles_dir", dotfilesDir).Msg("Loading configuration")
+	log.Info().Str("dotfiles_dir", dotfilesDir).Msg("Starting uninstallation")
 
-	cfg, err := config.LoadDir(dotfilesDir)
+	// Perform uninstallation using the uninstall module
+	result, err := module.Uninstall(dotfilesDir)
 	if err != nil {
-		return err
+		return fmt.Errorf("uninstall failed: %w", err)
 	}
 
-	log.Info().Int("modules", len(cfg.Modules)).Msg("Configuration loaded successfully")
+	// Log the results
+	log.Info().Str("summary", result.Summary).Msg("Uninstall completed")
 
-	// TODO: Implement uninstallation logic using cfg.Modules
-	for _, module := range cfg.Modules {
-		log.Info().Str("dir", module.Dir).Str("target_dir", module.TargetDir).Msg("Found module to uninstall")
+	// Log any errors that occurred during the process
+	if len(result.Errors) > 0 {
+		log.Warn().Int("error_count", len(result.Errors)).Msg("Errors occurred during uninstall")
+		for _, errorMsg := range result.Errors {
+			log.Warn().Str("error", errorMsg).Msg("Uninstall error")
+		}
 	}
 
-	log.Info().Msg("Uninstall command completed")
+	// Log skipped links with reasons
+	if len(result.SkippedLinks) > 0 {
+		log.Info().Int("skipped_count", len(result.SkippedLinks)).Msg("Some links were skipped")
+		for _, skipped := range result.SkippedLinks {
+			log.Info().
+				Str("target", skipped.Operation.Target).
+				Str("reason", skipped.Reason).
+				Msg("Skipped symlink removal")
+		}
+	}
+
+	// Log failed removals with reasons
+	if len(result.FailedRemovals) > 0 {
+		log.Error().Int("failed_count", len(result.FailedRemovals)).Msg("Some links failed to remove")
+		for _, failed := range result.FailedRemovals {
+			log.Error().
+				Str("target", failed.Operation.Target).
+				Str("reason", failed.Reason).
+				Msg("Failed symlink removal")
+		}
+	}
+
+	if !result.IsSuccess {
+		return fmt.Errorf("uninstall completed with errors: %s", result.Summary)
+	}
+
 	return nil
 }
 

@@ -1,7 +1,8 @@
 # install Specification
 
 ## Purpose
-TBD - created by archiving change implement-install-execution. Update Purpose after archive.
+Define the behavior and requirements for installing dotfiles by creating symlinks from source files to target locations.
+
 ## Requirements
 ### Requirement: Install Execution
 The system SHALL create symlinks from source dotfiles to target locations when running the install command without --dry-run.
@@ -40,8 +41,7 @@ The install command SHALL support a `--mkdir` flag to automatically create missi
 - **WHEN** directory creation fails due to permissions or other filesystem errors
 - **THEN** the system SHALL return an error
 - **AND** stop the installation process
-- **AND** report the specific directory creation failure</content>
-<parameter name="filePath">/home/chao/src/dotman/openspec/changes/add-mkdir-flag-to-install/specs/install/spec.md
+- **AND** report the specific directory creation failure
 
 ### Requirement: --force Flag Support
 The install command SHALL support a `--force` flag to handle conflicting target files by backing them up and proceeding with installation.
@@ -78,8 +78,7 @@ The install command SHALL support a `--force` flag to handle conflicting target 
 - **WHEN** user runs `install --force --mkdir`
 - **THEN** the system SHALL enable both force and mkdir behaviors
 - **AND** create missing directories as needed
-- **AND** backup conflicting files before creating symlinks</content>
-<parameter name="filePath">/home/chao/src/dotman/openspec/changes/implement-force-flag-for-install/specs/install/spec.md
+- **AND** backup conflicting files before creating symlinks
 
 ### Requirement: Install State Logging
 The system SHALL record all successful symlink installations in a state file for tracking and management purposes.
@@ -112,24 +111,19 @@ The system SHALL record all successful symlink installations in a state file for
 - **THEN** the system SHALL log a warning but continue with installation
 - **AND** not fail the entire installation process due to state logging issues
 
-### Requirement: Install-Uninstall Integration [MODIFIED]
-The install command SHALL create state file entries that enable safe and tracked uninstallation of dotfiles.
+## MODIFIED Requirements
 
-#### Scenario: State file entries for uninstall tracking
-- **WHEN** install command creates symlinks
-- **THEN** system SHALL record absolute paths for both source and target in state file
-- **AND** include file type as "link" to distinguish from generated files
-- **AND** ensure entries are sufficient for uninstall validation
+### Requirement: State File Cleanup Integration
+The system SHALL maintain state file entries that can be used by the uninstall command for safe removal.
 
 #### Scenario: State file persistence for uninstall
-- **WHEN** install command completes (both successful and with skipped symlinks)
-- **THEN** system SHALL ensure state file contains all tracked symlinks
-- **AND** maintain state file integrity for subsequent uninstall operations
-- **AND** handle state file corruption gracefully during uninstall
+- **WHEN** install command records symlinks in state file
+- **THEN** the system SHALL ensure entries contain complete source and target paths
+- **AND** use absolute paths to enable reliable validation during uninstall
+- **AND** maintain file type information to distinguish between links and generated files
 
-#### Scenario: Uninstall command dependency
-- **WHEN** uninstall command is executed
-- **THEN** system SHALL rely on state file entries created by install command
-- **AND** validate symlinks against recorded source paths before removal
-- **AND** only remove symlinks that match state file records exactly
-
+#### Scenario: State file consistency after failed installs
+- **WHEN** installation partially fails after some symlinks are created
+- **THEN** the system SHALL preserve state entries for successfully created symlinks
+- **AND** enable uninstall command to safely remove only the files that were actually installed
+- **AND** maintain state file integrity for subsequent operations

@@ -18,8 +18,8 @@ The system SHALL use the state file to determine which files to uninstall and va
 - **WHEN** a generated file's current SHA1 does not match the stored SHA1
 - **THEN** the system SHALL create a backup file with `.bak` extension
 - **AND** log a warning message indicating the file was modified
-- **AND** skip removal of the original file
-- **AND** keep the entry in state file for manual review
+- **AND** remove the original file
+- **AND** remove the entry from state file
 
 ### Requirement: File Validation Before Removal
 The system SHALL validate files before removal using appropriate checks for each file type.

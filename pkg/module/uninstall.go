@@ -123,7 +123,7 @@ func Uninstall(dotfilesDir string) (*UninstallResult, error) {
 
 		// Check if file content has been modified
 		if validationResult.BackupRequired {
-			// Create backup and skip removal
+			// Create backup before removal
 			backupPath, err := createBackup(fileMapping.Target)
 			if err != nil {
 				result.FailedRemovals = append(result.FailedRemovals, OperationResult{
@@ -140,8 +140,6 @@ func Uninstall(dotfilesDir string) (*UninstallResult, error) {
 				Reason:    fmt.Sprintf("backed up to %s", backupPath),
 			})
 			log.Warn().Str("target", fileMapping.Target).Str("backup", backupPath).Msg("Created backup for modified generated file")
-			// Skip removal for modified files - they remain in state for manual review
-			continue
 		}
 
 		// Remove the generated file
@@ -174,12 +172,12 @@ func Uninstall(dotfilesDir string) (*UninstallResult, error) {
 	totalRemoved := len(result.RemovedLinks) + len(result.RemovedGenerated)
 	totalSkipped := len(result.SkippedLinks) + len(result.SkippedGenerated)
 	if result.IsSuccess {
-		result.Summary = fmt.Sprintf("Uninstall successful: %d files removed (%d symlinks, %d generated), %d skipped (%d symlinks, %d generated), %d backed up, %d failed",
+		result.Summary = fmt.Sprintf("Uninstall successful: %d files removed (%d symlinks, %d generated), %d skipped (%d symlinks, %d generated), %d backed up and removed, %d failed",
 			totalRemoved, len(result.RemovedLinks), len(result.RemovedGenerated),
 			totalSkipped, len(result.SkippedLinks), len(result.SkippedGenerated),
 			len(result.BackedUpGenerated), len(result.FailedRemovals))
 	} else {
-		result.Summary = fmt.Sprintf("Uninstall completed with errors: %d files removed (%d symlinks, %d generated), %d skipped (%d symlinks, %d generated), %d backed up, %d failed",
+		result.Summary = fmt.Sprintf("Uninstall completed with errors: %d files removed (%d symlinks, %d generated), %d skipped (%d symlinks, %d generated), %d backed up and removed, %d failed",
 			totalRemoved, len(result.RemovedLinks), len(result.RemovedGenerated),
 			totalSkipped, len(result.SkippedLinks), len(result.SkippedGenerated),
 			len(result.BackedUpGenerated), len(result.FailedRemovals))

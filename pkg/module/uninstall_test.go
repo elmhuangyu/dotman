@@ -657,7 +657,7 @@ func TestUninstallWithGeneratedFiles(t *testing.T) {
 		assert.Len(t, updatedStateFile.Files, 0)
 	})
 
-	t.Run("uninstall generated file with SHA1 mismatch creates backup", func(t *testing.T) {
+	t.Run("uninstall generated file with SHA1 mismatch creates backup and removes file", func(t *testing.T) {
 		// Create a generated file
 		targetFile := filepath.Join(targetDir, "modified.txt")
 		originalContent := "original content"
@@ -688,7 +688,7 @@ func TestUninstallWithGeneratedFiles(t *testing.T) {
 		result, err := Uninstall(dotfilesDir)
 		require.NoError(t, err)
 		assert.True(t, result.IsSuccess)
-		assert.Len(t, result.RemovedGenerated, 0)
+		assert.Len(t, result.RemovedGenerated, 1)
 		assert.Len(t, result.BackedUpGenerated, 1)
 		assert.Len(t, result.SkippedGenerated, 0)
 
@@ -701,14 +701,14 @@ func TestUninstallWithGeneratedFiles(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, modifiedContent, string(backupContent))
 
-		// Verify original file still exists (modified files are not removed)
-		assert.FileExists(t, targetFile)
+		// Verify original file is removed (backed up files are now removed)
+		assert.NoFileExists(t, targetFile)
 
-		// Verify state file still contains the entry (backed up files remain)
+		// Verify state file is updated (backed up and removed files are cleaned up)
 		updatedStateFile, err := state.LoadStateFile(statePath)
 		require.NoError(t, err)
 		require.NotNil(t, updatedStateFile)
-		assert.Len(t, updatedStateFile.Files, 1)
+		assert.Len(t, updatedStateFile.Files, 0)
 	})
 
 	t.Run("uninstall mixed link and generated files", func(t *testing.T) {

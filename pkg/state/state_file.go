@@ -1,7 +1,9 @@
 package state
 
 import (
+	"crypto/sha1"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -108,5 +110,33 @@ func (sf *StateFile) AddFileMapping(source, target, fileType string) {
 		Target: absTarget,
 		Type:   fileType,
 	}
+
+	// Calculate SHA1 for generated files
+	if fileType == TypeGenerated {
+		if sha1, err := calculateSHA1(absTarget); err != nil {
+			// Log warning but continue - SHA1 failure shouldn't break installation
+			fmt.Printf("Warning: failed to calculate SHA1 for %s: %v\n", absTarget, err)
+		} else {
+			mapping.SHA1 = sha1
+		}
+	}
+
 	sf.Files = append(sf.Files, mapping)
+}
+
+// calculateSHA1 computes the SHA1 hash of a file's content
+func calculateSHA1(filePath string) (string, error) {
+	file, err := os.Open(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to open file for SHA1 calculation: %w", err)
+	}
+	defer file.Close()
+
+	hasher := sha1.New()
+	if _, err := io.Copy(hasher, file); err != nil {
+		return "", fmt.Errorf("failed to read file for SHA1 calculation: %w", err)
+	}
+
+	hash := hasher.Sum(nil)
+	return fmt.Sprintf("%x", hash), nil
 }

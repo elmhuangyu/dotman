@@ -293,7 +293,15 @@ func TestUninstallWithModifiedSymlinks(t *testing.T) {
 		// Verify skipped reasons
 		skipReasons := make(map[string]string)
 		for _, skipped := range uninstallResult.SkippedLinks {
-			skipReasons[skipped.Operation.Target] = skipped.Reason
+			reason := "unknown"
+			if skipped.Error != nil {
+				reason = skipped.Error.Error()
+			} else if skipped.Metadata != nil {
+				if r, ok := skipped.Metadata["reason"].(string); ok {
+					reason = r
+				}
+			}
+			skipReasons[skipped.Target] = reason
 		}
 
 		assert.Contains(t, skipReasons[targetFile1], "symlink points to")

@@ -1,4 +1,4 @@
-package module
+package template
 
 import (
 	"os"
@@ -9,8 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRenderTemplate(t *testing.T) {
+func TestRenderer_Render(t *testing.T) {
 	tempDir := t.TempDir()
+	renderer := NewRenderer()
 
 	tests := []struct {
 		name        string
@@ -38,6 +39,12 @@ func TestRenderTemplate(t *testing.T) {
 			expected: "Static content",
 		},
 		{
+			name:     "with ORIGINAL_FILE_PATH variable",
+			template: "File: {{.ORIGINAL_FILE_PATH}}",
+			vars:     map[string]string{},
+			expected: "File: Original file: " + filepath.Join(tempDir, "test.tmpl"),
+		},
+		{
 			name:        "missing variable",
 			template:    "Hello {{.MISSING}}!",
 			vars:        map[string]string{},
@@ -59,7 +66,7 @@ func TestRenderTemplate(t *testing.T) {
 			require.NoError(t, err)
 
 			// Render template
-			result, err := RenderTemplate(templatePath, test.vars)
+			result, err := renderer.Render(templatePath, test.vars)
 
 			if test.expectError {
 				assert.Error(t, err)
@@ -71,8 +78,9 @@ func TestRenderTemplate(t *testing.T) {
 	}
 }
 
-func TestValidateTemplate(t *testing.T) {
+func TestRenderer_Validate(t *testing.T) {
 	tempDir := t.TempDir()
+	renderer := NewRenderer()
 
 	tests := []struct {
 		name        string
@@ -88,6 +96,11 @@ func TestValidateTemplate(t *testing.T) {
 		{
 			name:     "valid template with no variables",
 			template: "Static content",
+			vars:     map[string]string{},
+		},
+		{
+			name:     "valid template with ORIGINAL_FILE_PATH",
+			template: "File: {{.ORIGINAL_FILE_PATH}}",
 			vars:     map[string]string{},
 		},
 		{
@@ -118,7 +131,7 @@ func TestValidateTemplate(t *testing.T) {
 			require.NoError(t, err)
 
 			// Validate template
-			err = ValidateTemplate(templatePath, test.vars)
+			err = renderer.Validate(templatePath, test.vars)
 
 			if test.expectError {
 				assert.Error(t, err)
@@ -127,4 +140,45 @@ func TestValidateTemplate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRenderer_RenderFileNotFound(t *testing.T) {
+	renderer := NewRenderer()
+
+	_, err := renderer.Render("/nonexistent/template.tmpl", map[string]string{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read template file")
+}
+
+func TestRenderer_ValidateFileNotFound(t *testing.T) {
+	renderer := NewRenderer()
+
+	err := renderer.Validate("/nonexistent/template.tmpl", map[string]string{})
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to read template file")
+}
+
+func TestRenderer_VarsNotModified(t *testing.T) {
+	tempDir := t.TempDir()
+	renderer := NewRenderer()
+
+	// Create template file
+	templatePath := filepath.Join(tempDir, "test.tmpl")
+	err := os.WriteFile(templatePath, []byte("Hello {{.NAME}}!"), 0644)
+	require.NoError(t, err)
+
+	// Original vars map
+	vars := map[string]string{"NAME": "World"}
+	originalVars := make(map[string]string)
+	for k, v := range vars {
+		originalVars[k] = v
+	}
+
+	// Render template
+	_, err = renderer.Render(templatePath, vars)
+	require.NoError(t, err)
+
+	// Check that original vars map was not modified
+	assert.Equal(t, originalVars, vars)
+	assert.NotContains(t, vars, "ORIGINAL_FILE_PATH")
 }

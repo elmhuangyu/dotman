@@ -1,4 +1,4 @@
-package module
+package template
 
 import (
 	"bytes"
@@ -8,8 +8,16 @@ import (
 	"text/template"
 )
 
-// RenderTemplate renders a Go text template file using the provided variables
-func RenderTemplate(templatePath string, vars map[string]string) ([]byte, error) {
+// Renderer implements TemplateRenderer interface
+type Renderer struct{}
+
+// NewRenderer creates a new template renderer
+func NewRenderer() *Renderer {
+	return &Renderer{}
+}
+
+// Render renders a Go text template file using the provided variables
+func (r *Renderer) Render(templatePath string, vars map[string]string) ([]byte, error) {
 	// Read the template file
 	templateContent, err := os.ReadFile(templatePath)
 	if err != nil {
@@ -21,7 +29,13 @@ func RenderTemplate(templatePath string, vars map[string]string) ([]byte, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get absolute path for %s: %w", templatePath, err)
 	}
-	vars["ORIGINAL_FILE_PATH"] = fmt.Sprintf("Original file: %s", absPath)
+
+	// Create a copy of vars to avoid modifying the original map
+	templateVars := make(map[string]string)
+	for k, v := range vars {
+		templateVars[k] = v
+	}
+	templateVars["ORIGINAL_FILE_PATH"] = fmt.Sprintf("Original file: %s", absPath)
 
 	// Parse the template with missingkey=error option
 	tmpl, err := template.New("template").Option("missingkey=error").Parse(string(templateContent))
@@ -31,15 +45,15 @@ func RenderTemplate(templatePath string, vars map[string]string) ([]byte, error)
 
 	// Execute the template with variables
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, vars); err != nil {
+	if err := tmpl.Execute(&buf, templateVars); err != nil {
 		return nil, fmt.Errorf("failed to execute template %s: %w", templatePath, err)
 	}
 
 	return buf.Bytes(), nil
 }
 
-// ValidateTemplate validates a template file syntax and required variables
-func ValidateTemplate(templatePath string, vars map[string]string) error {
+// Validate validates a template file syntax and required variables
+func (r *Renderer) Validate(templatePath string, vars map[string]string) error {
 	// Read the template file
 	templateContent, err := os.ReadFile(templatePath)
 	if err != nil {
@@ -51,7 +65,13 @@ func ValidateTemplate(templatePath string, vars map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("failed to get absolute path for %s: %w", templatePath, err)
 	}
-	vars["ORIGINAL_FILE_PATH"] = fmt.Sprintf("Original file: %s", absPath)
+
+	// Create a copy of vars to avoid modifying the original map
+	templateVars := make(map[string]string)
+	for k, v := range vars {
+		templateVars[k] = v
+	}
+	templateVars["ORIGINAL_FILE_PATH"] = fmt.Sprintf("Original file: %s", absPath)
 
 	// Parse the template to check syntax
 	tmpl, err := template.New("template").Option("missingkey=error").Parse(string(templateContent))
@@ -61,7 +81,7 @@ func ValidateTemplate(templatePath string, vars map[string]string) error {
 
 	// Try to execute the template to check for missing variables
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, vars); err != nil {
+	if err := tmpl.Execute(&buf, templateVars); err != nil {
 		return fmt.Errorf("template execution error in %s: %w", templatePath, err)
 	}
 

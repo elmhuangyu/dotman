@@ -1,4 +1,4 @@
-package module
+package validation
 
 import (
 	"os"
@@ -7,11 +7,13 @@ import (
 	"testing"
 
 	"github.com/elmhuangyu/dotman/pkg/config"
+	"github.com/elmhuangyu/dotman/pkg/module"
+	"github.com/elmhuangyu/dotman/pkg/module/template"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestValidateFileMapping(t *testing.T) {
+func TestValidator_ValidateFileMapping(t *testing.T) {
 	tempDir := t.TempDir()
 
 	// Create source file
@@ -19,12 +21,17 @@ func TestValidateFileMapping(t *testing.T) {
 	err := os.WriteFile(sourceFile, []byte("test content"), 0644)
 	require.NoError(t, err)
 
+	// Create template renderer
+	templateRenderer := template.NewRenderer()
+	var tr template.TemplateRenderer = templateRenderer
+	validator := NewValidator(tr)
+
 	t.Run("target does not exist", func(t *testing.T) {
 		targetFile := filepath.Join(tempDir, "target.txt")
 
-		operation, err := validateFileMapping(sourceFile, targetFile, false, map[string]string{})
+		operation, err := validator.validateFileMapping(sourceFile, targetFile, false, map[string]string{})
 		require.NoError(t, err)
-		assert.Equal(t, OperationCreateLink, operation.Type)
+		assert.Equal(t, module.OperationCreateLink, operation.Type)
 		assert.Equal(t, sourceFile, operation.Source)
 		assert.Equal(t, targetFile, operation.Target)
 	})
@@ -36,9 +43,9 @@ func TestValidateFileMapping(t *testing.T) {
 		err := os.Symlink(sourceFile, targetFile)
 		require.NoError(t, err)
 
-		operation, err := validateFileMapping(sourceFile, targetFile, false, map[string]string{})
+		operation, err := validator.validateFileMapping(sourceFile, targetFile, false, map[string]string{})
 		require.NoError(t, err)
-		assert.Equal(t, OperationSkip, operation.Type)
+		assert.Equal(t, module.OperationSkip, operation.Type)
 	})
 
 	t.Run("target exists as wrong symlink", func(t *testing.T) {
@@ -53,9 +60,9 @@ func TestValidateFileMapping(t *testing.T) {
 		err = os.Symlink(wrongSource, targetFile)
 		require.NoError(t, err)
 
-		operation, err := validateFileMapping(sourceFile, targetFile, false, map[string]string{})
+		operation, err := validator.validateFileMapping(sourceFile, targetFile, false, map[string]string{})
 		require.NoError(t, err)
-		assert.Equal(t, OperationForceLink, operation.Type)
+		assert.Equal(t, module.OperationForceLink, operation.Type)
 		assert.Contains(t, operation.Description, "target exists as symlink pointing to wrong file")
 		assert.Contains(t, operation.Description, wrongSource)
 	})
@@ -67,9 +74,9 @@ func TestValidateFileMapping(t *testing.T) {
 		err := os.WriteFile(targetFile, []byte("existing content"), 0644)
 		require.NoError(t, err)
 
-		operation, err := validateFileMapping(sourceFile, targetFile, false, map[string]string{})
+		operation, err := validator.validateFileMapping(sourceFile, targetFile, false, map[string]string{})
 		require.NoError(t, err)
-		assert.Equal(t, OperationForceLink, operation.Type)
+		assert.Equal(t, module.OperationForceLink, operation.Type)
 		assert.Equal(t, "target exists as regular file", operation.Description)
 	})
 
@@ -80,9 +87,9 @@ func TestValidateFileMapping(t *testing.T) {
 		err := os.WriteFile(targetFile, []byte("existing content"), 0644)
 		require.NoError(t, err)
 
-		operation, err := validateFileMapping(sourceFile, targetFile, true, map[string]string{})
+		operation, err := validator.validateFileMapping(sourceFile, targetFile, true, map[string]string{})
 		require.NoError(t, err)
-		assert.Equal(t, OperationForceTemplate, operation.Type)
+		assert.Equal(t, module.OperationForceTemplate, operation.Type)
 		assert.Equal(t, "target exists as file (template would overwrite)", operation.Description)
 	})
 
@@ -90,7 +97,7 @@ func TestValidateFileMapping(t *testing.T) {
 		nonExistentSource := filepath.Join(tempDir, "nonexistent.txt")
 		targetFile := filepath.Join(tempDir, "target.txt")
 
-		_, err := validateFileMapping(nonExistentSource, targetFile, false, map[string]string{})
+		_, err := validator.validateFileMapping(nonExistentSource, targetFile, false, map[string]string{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "source file does not exist")
 	})
@@ -102,14 +109,17 @@ func TestValidateFileMapping(t *testing.T) {
 
 		targetFile := filepath.Join(tempDir, "target.txt")
 
-		_, err = validateFileMapping(sourceDir, targetFile, false, map[string]string{})
+		_, err = validator.validateFileMapping(sourceDir, targetFile, false, map[string]string{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "source is a directory")
 	})
 }
 
-func TestValidateTargetDirectories(t *testing.T) {
+func TestValidator_ValidateTargetDirectories(t *testing.T) {
 	tempDir := t.TempDir()
+
+	templateRenderer := template.NewRenderer()
+	validator := NewValidator(templateRenderer)
 
 	t.Run("valid target directory", func(t *testing.T) {
 		targetDir := filepath.Join(tempDir, "valid_target")
@@ -121,19 +131,19 @@ func TestValidateTargetDirectories(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		errors := ValidateTargetDirectories([]config.ModuleConfig{module}, false)
+		errors := validator.ValidateTargetDirectories([]config.ModuleConfig{module}, false)
 		assert.Empty(t, errors)
 	})
 
 	t.Run("target directory does not exist", func(t *testing.T) {
 		targetDir := filepath.Join(tempDir, "nonexistent_target")
 
-		module := config.ModuleConfig{
+		moduleConfig := config.ModuleConfig{
 			Dir:       filepath.Join(tempDir, "module"),
 			TargetDir: targetDir,
 		}
 
-		errors := ValidateTargetDirectories([]config.ModuleConfig{module}, false)
+		errors := validator.ValidateTargetDirectories([]config.ModuleConfig{moduleConfig}, false)
 		assert.NotEmpty(t, errors) // Non-existent directories should fail
 		assert.Contains(t, errors[0], "target directory does not exist")
 	})
@@ -151,12 +161,12 @@ func TestValidateTargetDirectories(t *testing.T) {
 		err = os.Symlink(realDir, linkDir)
 		require.NoError(t, err)
 
-		module := config.ModuleConfig{
+		moduleConfig := config.ModuleConfig{
 			Dir:       filepath.Join(tempDir, "module"),
 			TargetDir: linkDir,
 		}
 
-		errors := ValidateTargetDirectories([]config.ModuleConfig{module}, false)
+		errors := validator.ValidateTargetDirectories([]config.ModuleConfig{moduleConfig}, false)
 		assert.NotEmpty(t, errors)
 		assert.Contains(t, errors[0], "is a symlink")
 	})
@@ -180,12 +190,12 @@ func TestValidateTargetDirectories(t *testing.T) {
 		err = os.Symlink(realDir, linkDir)
 		require.NoError(t, err)
 
-		module := config.ModuleConfig{
+		moduleConfig := config.ModuleConfig{
 			Dir:       filepath.Join(tempDir, "module"),
 			TargetDir: targetDir,
 		}
 
-		errors := ValidateTargetDirectories([]config.ModuleConfig{module}, false)
+		errors := validator.ValidateTargetDirectories([]config.ModuleConfig{moduleConfig}, false)
 		assert.NotEmpty(t, errors)
 		assert.Contains(t, errors[0], "is a symlink")
 	})
@@ -193,31 +203,34 @@ func TestValidateTargetDirectories(t *testing.T) {
 	t.Run("target directory does not exist but mkdir is true", func(t *testing.T) {
 		targetDir := filepath.Join(tempDir, "mkdir_target")
 
-		module := config.ModuleConfig{
+		moduleConfig := config.ModuleConfig{
 			Dir:       filepath.Join(tempDir, "module"),
 			TargetDir: targetDir,
 		}
 
-		errors := ValidateTargetDirectories([]config.ModuleConfig{module}, true)
+		errors := validator.ValidateTargetDirectories([]config.ModuleConfig{moduleConfig}, true)
 		assert.Empty(t, errors) // Should not fail when mkdir is true
 	})
 }
 
-func TestValidateDirectoryStructure(t *testing.T) {
+func TestValidator_ValidateDirectoryStructure(t *testing.T) {
 	tempDir := t.TempDir()
+
+	templateRenderer := template.NewRenderer()
+	validator := NewValidator(templateRenderer)
 
 	t.Run("valid directory structure", func(t *testing.T) {
 		dir := filepath.Join(tempDir, "valid", "path")
 		err := os.MkdirAll(dir, 0755)
 		require.NoError(t, err)
 
-		err = validateDirectoryStructure(dir, false)
+		err = validator.validateDirectoryStructure(dir, false)
 		assert.NoError(t, err)
 	})
 
 	t.Run("non-existent directory", func(t *testing.T) {
 		nonExistent := filepath.Join(tempDir, "nonexistent", "path")
-		err := validateDirectoryStructure(nonExistent, false)
+		err := validator.validateDirectoryStructure(nonExistent, false)
 		assert.Error(t, err) // Non-existent directories should fail
 		assert.Contains(t, err.Error(), "target directory does not exist")
 	})
@@ -235,7 +248,7 @@ func TestValidateDirectoryStructure(t *testing.T) {
 		err = os.Symlink(realDir, linkDir)
 		require.NoError(t, err)
 
-		err = validateDirectoryStructure(linkDir, false)
+		err = validator.validateDirectoryStructure(linkDir, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is a symlink")
 	})
@@ -245,7 +258,7 @@ func TestValidateDirectoryStructure(t *testing.T) {
 		err := os.WriteFile(file, []byte("content"), 0644)
 		require.NoError(t, err)
 
-		err = validateDirectoryStructure(file, false)
+		err = validator.validateDirectoryStructure(file, false)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "is not a directory")
 	})
@@ -253,13 +266,16 @@ func TestValidateDirectoryStructure(t *testing.T) {
 	t.Run("non-existent directory with mkdir true", func(t *testing.T) {
 		nonExistent := filepath.Join(tempDir, "mkdir", "path")
 
-		err := validateDirectoryStructure(nonExistent, true)
+		err := validator.validateDirectoryStructure(nonExistent, true)
 		assert.NoError(t, err) // Should not fail when mkdir is true
 	})
 }
 
-func TestValidateInstallation(t *testing.T) {
+func TestValidator_ValidateInstallation(t *testing.T) {
 	tempDir := t.TempDir()
+
+	templateRenderer := template.NewRenderer()
+	validator := NewValidator(templateRenderer)
 
 	t.Run("successful validation", func(t *testing.T) {
 		// Create source files
@@ -279,13 +295,26 @@ func TestValidateInstallation(t *testing.T) {
 		err = os.MkdirAll(targetDir, 0755)
 		require.NoError(t, err)
 
+		// Create module directory and files
+		moduleDir := filepath.Join(tempDir, "module")
+		err = os.MkdirAll(moduleDir, 0755)
+		require.NoError(t, err)
+
+		// Copy source files to module directory
+		moduleFile1 := filepath.Join(moduleDir, "file1.txt")
+		moduleFile2 := filepath.Join(moduleDir, "file2.txt")
+		err = os.WriteFile(moduleFile1, []byte("content1"), 0644)
+		require.NoError(t, err)
+		err = os.WriteFile(moduleFile2, []byte("content2"), 0644)
+		require.NoError(t, err)
+
 		// Create module config
-		module := config.ModuleConfig{
-			Dir:       sourceDir,
+		moduleConfig := config.ModuleConfig{
+			Dir:       moduleDir,
 			TargetDir: targetDir,
 		}
 
-		validation, err := ValidateInstallation([]config.ModuleConfig{module}, map[string]string{})
+		validation, err := validator.ValidateInstallation([]config.ModuleConfig{moduleConfig}, map[string]string{})
 		require.NoError(t, err)
 		assert.NotNil(t, validation)
 		assert.True(t, validation.IsValid)
@@ -294,7 +323,7 @@ func TestValidateInstallation(t *testing.T) {
 		// Should have 2 create operations
 		createOps := 0
 		for _, op := range validation.Operations {
-			if op.Type == OperationCreateLink {
+			if op.Type == module.OperationCreateLink {
 				createOps++
 			}
 		}
@@ -331,7 +360,7 @@ func TestValidateInstallation(t *testing.T) {
 			TargetDir: targetDir,
 		}
 
-		validation, err := ValidateInstallation([]config.ModuleConfig{module1, module2}, map[string]string{})
+		validation, err := validator.ValidateInstallation([]config.ModuleConfig{module1, module2}, map[string]string{})
 		require.NoError(t, err)
 		assert.NotNil(t, validation)
 		assert.False(t, validation.IsValid)

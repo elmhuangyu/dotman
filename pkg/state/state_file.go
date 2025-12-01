@@ -124,6 +124,43 @@ func (sf *StateFile) AddFileMapping(source, target, fileType string) {
 	sf.Files = append(sf.Files, mapping)
 }
 
+// AddMapping adds a file mapping to the state file (package-level function)
+func AddMapping(stateFile *StateFile, source, target, fileType string) error {
+	stateFile.AddFileMapping(source, target, fileType)
+	return nil
+}
+
+// RemoveMappings removes file mappings from the state file by target paths
+func RemoveMappings(stateFile *StateFile, targets []string) error {
+	// Create a set of targets to remove for efficient lookup
+	targetSet := make(map[string]bool)
+	for _, target := range targets {
+		// Convert to absolute path for comparison
+		absTarget, err := filepath.Abs(target)
+		if err != nil {
+			absTarget = target // fallback to original if conversion fails
+		}
+		targetSet[absTarget] = true
+	}
+
+	// Filter out mappings that match the targets
+	var remainingFiles []FileMapping
+	for _, mapping := range stateFile.Files {
+		// Convert mapping target to absolute path for comparison
+		absMappingTarget, err := filepath.Abs(mapping.Target)
+		if err != nil {
+			absMappingTarget = mapping.Target // fallback to original if conversion fails
+		}
+
+		if !targetSet[absMappingTarget] {
+			remainingFiles = append(remainingFiles, mapping)
+		}
+	}
+
+	stateFile.Files = remainingFiles
+	return nil
+}
+
 // calculateSHA1 computes the SHA1 hash of a file's content
 func calculateSHA1(filePath string) (string, error) {
 	file, err := os.Open(filePath)

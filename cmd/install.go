@@ -105,8 +105,17 @@ func install(dotfilesDir string, dryRun, force, mkdir bool) error {
 		return nil
 	}
 
-	// Perform installation, module.Install will also call validate
-	installResult, err := module.Install(cfg.Modules, vars, mkdir, force, dotfilesDir)
+	// Create install configuration
+	installConfig := &module.InstallConfig{
+		Mkdir:     mkdir,
+		Force:     force,
+		DryRun:    false,
+		Vars:      vars,
+		StatePath: dotfilesDir,
+	}
+
+	// Perform installation using the new configuration
+	installResult, err := module.InstallWithConfig(cfg.Modules, installConfig)
 	if err != nil {
 		return fmt.Errorf("installation failed: %w", err)
 	}

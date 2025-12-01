@@ -19,14 +19,6 @@ type FileMapping struct {
 	templates map[string]string
 }
 
-// ValidationResult contains the results of dry-run validation
-type ValidationResult struct {
-	IsValid    bool
-	Mappings   *FileMapping
-	Errors     []string
-	Operations []FileOperation
-}
-
 // FileOperation represents a file operation that would be performed
 type FileOperation struct {
 	Type        OperationType
@@ -34,17 +26,6 @@ type FileOperation struct {
 	Target      string
 	Description string
 }
-
-// OperationType represents the type of file operation
-type OperationType string
-
-const (
-	OperationCreateLink     OperationType = "create_link"
-	OperationCreateTemplate OperationType = "create_template"
-	OperationForceLink      OperationType = "force_link"
-	OperationForceTemplate  OperationType = "force_template"
-	OperationSkip           OperationType = "skip"
-)
 
 // NewFileMapping creates a new empty FileMapping
 func NewFileMapping() *FileMapping {

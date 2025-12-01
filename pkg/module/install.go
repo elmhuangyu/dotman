@@ -1,13 +1,10 @@
 package module
 
 import (
-	"fmt"
-	"os"
-	"path/filepath"
-
 	"github.com/elmhuangyu/dotman/pkg/config"
-	"github.com/elmhuangyu/dotman/pkg/logger"
-	"github.com/elmhuangyu/dotman/pkg/state"
+	"github.com/elmhuangyu/dotman/pkg/module/filesystem"
+	"github.com/elmhuangyu/dotman/pkg/module/state"
+	"github.com/elmhuangyu/dotman/pkg/module/template"
 )
 
 // InstallResult contains the results of an installation
@@ -22,300 +19,35 @@ type InstallResult struct {
 
 // Install performs the actual installation of dotfiles by creating symlinks and generating template files
 func Install(modules []config.ModuleConfig, rootVars map[string]string, mkdir bool, force bool, dotfilesDir string) (*InstallResult, error) {
-	log := logger.GetLogger()
-
-	log.Info().Int("modules", len(modules)).Msg("Starting installation")
-
-	// Initialize state file
-	var stateFile *state.StateFile
-	var statePath string
-	var err error
-
-	if dotfilesDir != "" {
-		statePath = filepath.Join(dotfilesDir, "state.yaml")
-		stateFile, err = state.LoadStateFile(statePath)
-		if err != nil {
-			log.Warn().Err(err).Msg("Failed to load state file, continuing without state logging")
-			stateFile = nil
-		}
-		if stateFile == nil {
-			stateFile = state.NewStateFile()
-		}
+	config := &InstallConfig{
+		Mkdir:     mkdir,
+		Force:     force,
+		DryRun:    false,
+		Vars:      rootVars,
+		StatePath: dotfilesDir,
 	}
-
-	// First validate the installation
-	validation, err := Validate(modules, rootVars, mkdir, force)
-	if err != nil {
-		return nil, fmt.Errorf("validation failed: %w", err)
-	}
-
-	result := &InstallResult{
-		IsSuccess: true,
-		Errors:    []string{},
-	}
-
-	// Check for validation errors or conflicts - if any exist, fail the installation
-	if len(validation.Errors) > 0 {
-		result.IsSuccess = false
-		result.Errors = validation.Errors
-		result.Summary = fmt.Sprintf("Installation failed: %d validation errors", len(validation.Errors))
-		return result, nil
-	}
-
-	// Check for conflicts in the operations
-	forceOps := len(validation.ForceLinkOperations) + len(validation.ForceTemplateOps)
-	if forceOps > 0 && !force {
-		result.IsSuccess = false
-		result.Errors = append(result.Errors, "conflicts detected - installation would overwrite existing files")
-		result.Summary = "Installation failed: conflicts detected"
-		return result, nil
-	}
-
-	result.SkippedLinks = validation.SkipOperations
-
-	// Record skipped files in state file
-	for _, operation := range validation.SkipOperations {
-		if stateFile != nil {
-			stateFile.AddFileMapping(operation.Source, operation.Target, state.TypeLink)
-			if err := saveStateFile(statePath, stateFile); err != nil {
-				log.Warn().Err(err).Msg("Failed to save state file for skipped operation")
-			}
-		}
-		log.Info().Str("source", operation.Source).Str("target", operation.Target).Msg("Skipped (correct symlink already exists)")
-	}
-
-	// Perform the installation of symlinks
-	for _, operation := range validation.CreateOperations {
-		if err := createSymlink(operation.Source, operation.Target, mkdir); err != nil {
-			result.IsSuccess = false
-			result.Errors = append(result.Errors, fmt.Sprintf("failed to create symlink %s -> %s: %v", operation.Source, operation.Target, err))
-		} else {
-			// Record successful symlink in state file
-			if stateFile != nil {
-				stateFile.AddFileMapping(operation.Source, operation.Target, state.TypeLink)
-				if err := saveStateFile(statePath, stateFile); err != nil {
-					log.Warn().Err(err).Msg("Failed to save state file")
-				}
-			}
-		}
-		result.CreatedLinks = append(result.CreatedLinks, operation)
-		log.Info().Str("source", operation.Source).Str("target", operation.Target).Msg("Created symlink")
-
-		if !result.IsSuccess {
-			break
-		}
-	}
-
-	// Perform template file generation
-	for _, operation := range validation.CreateTemplateOps {
-		if err := createTemplateFile(operation.Source, operation.Target, rootVars, mkdir); err != nil {
-			result.IsSuccess = false
-			result.Errors = append(result.Errors, fmt.Sprintf("failed to create template file %s -> %s: %v", operation.Source, operation.Target, err))
-		} else {
-			// Record successful template generation in state file
-			if stateFile != nil {
-				stateFile.AddFileMapping(operation.Source, operation.Target, state.TypeGenerated)
-				if err := saveStateFile(statePath, stateFile); err != nil {
-					log.Warn().Err(err).Msg("Failed to save state file for template")
-				}
-			}
-			result.CreatedTemplates = append(result.CreatedTemplates, operation)
-			log.Info().Str("source", operation.Source).Str("target", operation.Target).Msg("Created template file")
-		}
-
-		if !result.IsSuccess {
-			break
-		}
-	}
-
-	// Handle force operations (both links and templates)
-	if force {
-		// Handle force link operations
-		for _, operation := range validation.ForceLinkOperations {
-			if err := backupAndCreateSymlink(operation.Source, operation.Target, mkdir); err != nil {
-				result.IsSuccess = false
-				result.Errors = append(result.Errors, fmt.Sprintf("failed to backup and create symlink %s -> %s: %v", operation.Source, operation.Target, err))
-			} else {
-				// Record successful symlink in state file
-				if stateFile != nil {
-					stateFile.AddFileMapping(operation.Source, operation.Target, state.TypeLink)
-					if err := saveStateFile(statePath, stateFile); err != nil {
-						log.Warn().Err(err).Msg("Failed to save state file")
-					}
-				}
-				result.CreatedLinks = append(result.CreatedLinks, operation)
-				log.Warn().Str("source", operation.Source).Str("target", operation.Target).Msg("Backed up existing file and created symlink")
-			}
-
-			if !result.IsSuccess {
-				break
-			}
-		}
-
-		// Handle force template operations
-		for _, operation := range validation.ForceTemplateOps {
-			if err := backupAndCreateTemplateFile(operation.Source, operation.Target, rootVars, mkdir); err != nil {
-				result.IsSuccess = false
-				result.Errors = append(result.Errors, fmt.Sprintf("failed to backup and create template file %s -> %s: %v", operation.Source, operation.Target, err))
-			} else {
-				// Record successful template generation in state file
-				if stateFile != nil {
-					stateFile.AddFileMapping(operation.Source, operation.Target, state.TypeGenerated)
-					if err := saveStateFile(statePath, stateFile); err != nil {
-						log.Warn().Err(err).Msg("Failed to save state file for template")
-					}
-				}
-				result.CreatedTemplates = append(result.CreatedTemplates, operation)
-				log.Warn().Str("source", operation.Source).Str("target", operation.Target).Msg("Backed up existing file and created template file")
-			}
-
-			if !result.IsSuccess {
-				break
-			}
-		}
-	}
-
-	// Generate summary
-	if result.IsSuccess {
-		result.Summary = fmt.Sprintf("Installation successful: %d symlinks created, %d template files generated, %d skipped", len(result.CreatedLinks), len(result.CreatedTemplates), len(result.SkippedLinks))
-	} else {
-		result.Summary = fmt.Sprintf("Installation failed: %d errors", len(result.Errors))
-	}
-
-	log.Info().Bool("success", result.IsSuccess).Msg("Installation completed")
-
-	return result, nil
+	return InstallWithConfig(modules, config)
 }
 
-// saveStateFile saves the state file with error logging
-func saveStateFile(path string, stateFile *state.StateFile) error {
-	return state.SaveStateFile(path, stateFile)
-}
+// InstallWithConfig performs installation using the provided configuration
+func InstallWithConfig(modules []config.ModuleConfig, config *InstallConfig) (*InstallResult, error) {
+	// Initialize dependencies
+	fileOp := filesystem.NewOperator()
+	templateRenderer := template.NewRenderer()
+	stateMgr := state.NewStateManager()
 
-// createSymlink creates a symlink from source to target
-func createSymlink(source, target string, mkdir bool) error {
-	// Ensure target directory exists
-	targetDir := filepath.Dir(target)
-	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-		if mkdir {
-			// Create missing directories
-			if err := os.MkdirAll(targetDir, 0755); err != nil {
-				return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
-			}
-		} else {
-			return fmt.Errorf("target directory does not exist: %s", targetDir)
-		}
+	// Create installer
+	installer := NewInstaller(fileOp, templateRenderer, stateMgr)
+
+	// Create install request
+	req := &InstallRequest{
+		Modules:     modules,
+		RootVars:    config.Vars,
+		Mkdir:       config.Mkdir,
+		Force:       config.Force,
+		DotfilesDir: config.StatePath,
 	}
 
-	// Get absolute path for source
-	absSource, err := filepath.Abs(source)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path for source %s: %w", source, err)
-	}
-
-	// Create the symlink using absolute path
-	if err := os.Symlink(absSource, target); err != nil {
-		return fmt.Errorf("failed to create symlink: %w", err)
-	}
-
-	return nil
-}
-
-// backupAndCreateSymlink backs up the existing target file and creates a symlink
-func backupAndCreateSymlink(source, target string, mkdir bool) error {
-	// Ensure target directory exists
-	targetDir := filepath.Dir(target)
-	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-		if mkdir {
-			// Create missing directories
-			if err := os.MkdirAll(targetDir, 0755); err != nil {
-				return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
-			}
-		} else {
-			return fmt.Errorf("target directory does not exist: %s", targetDir)
-		}
-	}
-
-	// Backup existing file
-	backupPath := target + ".bak"
-	if err := os.Rename(target, backupPath); err != nil {
-		return fmt.Errorf("failed to backup existing file %s to %s: %w", target, backupPath, err)
-	}
-
-	// Get absolute path for source
-	absSource, err := filepath.Abs(source)
-	if err != nil {
-		return fmt.Errorf("failed to get absolute path for source %s: %w", source, err)
-	}
-
-	// Create the symlink using absolute path
-	if err := os.Symlink(absSource, target); err != nil {
-		return fmt.Errorf("failed to create symlink: %w", err)
-	}
-
-	return nil
-}
-
-// createTemplateFile creates a template file by rendering the template and writing to target
-func createTemplateFile(source, target string, vars map[string]string, mkdir bool) error {
-	// Ensure target directory exists
-	targetDir := filepath.Dir(target)
-	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-		if mkdir {
-			// Create missing directories
-			if err := os.MkdirAll(targetDir, 0755); err != nil {
-				return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
-			}
-		} else {
-			return fmt.Errorf("target directory does not exist: %s", targetDir)
-		}
-	}
-
-	// Render the template
-	content, err := RenderTemplate(source, vars)
-	if err != nil {
-		return fmt.Errorf("failed to render template: %w", err)
-	}
-
-	// Write the rendered content to the target file
-	if err := os.WriteFile(target, content, 0644); err != nil {
-		return fmt.Errorf("failed to write template file: %w", err)
-	}
-
-	return nil
-}
-
-// backupAndCreateTemplateFile backs up the existing target file and creates a template file
-func backupAndCreateTemplateFile(source, target string, vars map[string]string, mkdir bool) error {
-	// Ensure target directory exists
-	targetDir := filepath.Dir(target)
-	if _, err := os.Stat(targetDir); os.IsNotExist(err) {
-		if mkdir {
-			// Create missing directories
-			if err := os.MkdirAll(targetDir, 0755); err != nil {
-				return fmt.Errorf("failed to create target directory %s: %w", targetDir, err)
-			}
-		} else {
-			return fmt.Errorf("target directory does not exist: %s", targetDir)
-		}
-	}
-
-	// Backup existing file
-	backupPath := target + ".bak"
-	if err := os.Rename(target, backupPath); err != nil {
-		return fmt.Errorf("failed to backup existing file %s to %s: %w", target, backupPath, err)
-	}
-
-	// Render the template
-	content, err := RenderTemplate(source, vars)
-	if err != nil {
-		return fmt.Errorf("failed to render template: %w", err)
-	}
-
-	// Write the rendered content to the target file
-	if err := os.WriteFile(target, content, 0644); err != nil {
-		return fmt.Errorf("failed to write template file: %w", err)
-	}
-
-	return nil
+	// Perform installation
+	return installer.Install(req)
 }

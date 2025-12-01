@@ -16,10 +16,11 @@ type ValidateResult struct {
 	Summary string
 	Errors  []string
 	// Grouped operations by type
-	CreateOperations   []FileOperation
-	CreateTemplateOps  []FileOperation
-	SkipOperations     []FileOperation
-	ConflictOperations []FileOperation
+	CreateOperations    []FileOperation
+	CreateTemplateOps   []FileOperation
+	ForceLinkOperations []FileOperation
+	ForceTemplateOps    []FileOperation
+	SkipOperations      []FileOperation
 }
 
 // Validate performs a complete dry-run validation and returns structured results
@@ -62,23 +63,26 @@ func Validate(modules []config.ModuleConfig, vars map[string]string, mkdir bool,
 			result.CreateOperations = append(result.CreateOperations, op)
 		case OperationCreateTemplate:
 			result.CreateTemplateOps = append(result.CreateTemplateOps, op)
+		case OperationForceLink:
+			result.ForceLinkOperations = append(result.ForceLinkOperations, op)
+		case OperationForceTemplate:
+			result.ForceTemplateOps = append(result.ForceTemplateOps, op)
 		case OperationSkip:
 			result.SkipOperations = append(result.SkipOperations, op)
-		case OperationConflict:
-			result.ConflictOperations = append(result.ConflictOperations, op)
 		}
 	}
 
 	// Sort operations for consistent output
 	sortFileOperations(result.CreateOperations)
 	sortFileOperations(result.CreateTemplateOps)
+	sortFileOperations(result.ForceLinkOperations)
+	sortFileOperations(result.ForceTemplateOps)
 	sortFileOperations(result.SkipOperations)
-	sortFileOperations(result.ConflictOperations)
 
-	// Conflicts make the dry run invalid, unless in force mode
+	// Force operations make the dry run invalid, unless in force mode
 	// In force mode, only module config conflicts (multiple sources to same target) should fail
 	// Target file conflicts (existing files) are allowed in force mode
-	if len(result.ConflictOperations) > 0 && !force {
+	if (len(result.ForceLinkOperations) > 0 || len(result.ForceTemplateOps) > 0) && !force {
 		result.IsValid = false
 	}
 
@@ -99,7 +103,7 @@ func sortFileOperations(ops []FileOperation) {
 
 // generateValidationSummary creates a human-readable summary of the validation results
 func generateValidationSummary(result *ValidateResult, force bool) string {
-	totalOps := len(result.CreateOperations) + len(result.CreateTemplateOps) + len(result.SkipOperations) + len(result.ConflictOperations)
+	totalOps := len(result.CreateOperations) + len(result.CreateTemplateOps) + len(result.ForceLinkOperations) + len(result.ForceTemplateOps) + len(result.SkipOperations)
 
 	summary := fmt.Sprintf("Validation Summary: %d total file operations\n", totalOps)
 
@@ -111,16 +115,17 @@ func generateValidationSummary(result *ValidateResult, force bool) string {
 		summary += fmt.Sprintf("  • %d template files would be generated\n", len(result.CreateTemplateOps))
 	}
 
-	if len(result.SkipOperations) > 0 {
-		summary += fmt.Sprintf("  • %d files skipped (correct symlinks already exist)\n", len(result.SkipOperations))
+	forceOps := len(result.ForceLinkOperations) + len(result.ForceTemplateOps)
+	if forceOps > 0 {
+		if force {
+			summary += fmt.Sprintf("  • %d conflicts found (will be backed up in force mode)\n", forceOps)
+		} else {
+			summary += fmt.Sprintf("  • %d conflicts found (targets exist as regular files or wrong symlinks)\n", forceOps)
+		}
 	}
 
-	if len(result.ConflictOperations) > 0 {
-		if force {
-			summary += fmt.Sprintf("  • %d conflicts found (will be backed up in force mode)\n", len(result.ConflictOperations))
-		} else {
-			summary += fmt.Sprintf("  • %d conflicts found (targets exist as regular files or wrong symlinks)\n", len(result.ConflictOperations))
-		}
+	if len(result.SkipOperations) > 0 {
+		summary += fmt.Sprintf("  • %d files skipped (correct symlinks already exist)\n", len(result.SkipOperations))
 	}
 
 	if len(result.Errors) > 0 {
@@ -138,9 +143,10 @@ func LogValidateResult(result *ValidateResult) {
 	log.Info().Msg(result.Summary)
 
 	// Log conflicts (these are the most important details)
-	if len(result.ConflictOperations) > 0 {
+	forceOps := append(result.ForceLinkOperations, result.ForceTemplateOps...)
+	if len(forceOps) > 0 {
 		log.Warn().Msg("Conflicts found:")
-		for _, op := range result.ConflictOperations {
+		for _, op := range forceOps {
 			log.Warn().Msgf("  %s -> %s (%s)", op.Source, op.Target, op.Description)
 		}
 	}

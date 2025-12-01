@@ -94,7 +94,8 @@ func install(dotfilesDir string, dryRun, force, mkdir bool) error {
 
 		// Return error if validation failed
 		if !result.IsValid {
-			return fmt.Errorf("validation failed with %d errors and %d conflicts", len(result.Errors), len(result.ConflictOperations))
+			forceOps := len(result.ForceLinkOperations) + len(result.ForceTemplateOps)
+			return fmt.Errorf("validation failed with %d errors and %d conflicts", len(result.Errors), forceOps)
 		}
 
 		log.Info().Msg("Dry-run completed successfully - no changes were made")

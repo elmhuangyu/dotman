@@ -44,7 +44,8 @@ func TestDryRun(t *testing.T) {
 		assert.Empty(t, result.Errors)
 		assert.Len(t, result.CreateOperations, 2)
 		assert.Empty(t, result.SkipOperations)
-		assert.Empty(t, result.ConflictOperations)
+		assert.Empty(t, result.ForceLinkOperations)
+		assert.Empty(t, result.ForceTemplateOps)
 
 		// Check summary
 		assert.Contains(t, result.Summary, "2 total file operations")
@@ -87,9 +88,10 @@ func TestDryRun(t *testing.T) {
 
 		assert.True(t, result.IsValid)
 		assert.Empty(t, result.Errors)
-		assert.Empty(t, result.CreateOperations)
-		assert.Len(t, result.SkipOperations, 1) // config.txt (existing correct symlink)
-		assert.Empty(t, result.ConflictOperations)
+		assert.Len(t, result.CreateOperations, 0)
+		assert.Len(t, result.SkipOperations, 1)
+		assert.Empty(t, result.ForceLinkOperations)
+		assert.Empty(t, result.ForceTemplateOps)
 
 		// Check summary
 		assert.Contains(t, result.Summary, "1 files skipped")
@@ -133,7 +135,8 @@ func TestDryRun(t *testing.T) {
 		assert.Empty(t, result.Errors)  // No validation errors, but conflict operations exist
 		assert.Empty(t, result.CreateOperations)
 		assert.Empty(t, result.SkipOperations)
-		assert.Len(t, result.ConflictOperations, 1)
+		assert.Len(t, result.ForceLinkOperations, 1)
+		assert.Empty(t, result.ForceTemplateOps)
 
 		// Check summary
 		assert.Contains(t, result.Summary, "1 conflicts found")
@@ -180,7 +183,8 @@ func TestDryRun(t *testing.T) {
 		assert.Empty(t, result.Errors)
 		assert.Len(t, result.CreateOperations, 1) // old_config.txt
 		assert.Empty(t, result.SkipOperations)
-		assert.Len(t, result.ConflictOperations, 1) // config.txt (wrong symlink)
+		assert.Len(t, result.ForceLinkOperations, 1) // config.txt (wrong symlink)
+		assert.Empty(t, result.ForceTemplateOps)
 
 		// Check summary
 		assert.Contains(t, result.Summary, "2 total file operations")
@@ -219,7 +223,8 @@ func TestDryRun(t *testing.T) {
 		assert.Empty(t, result.Errors)
 		assert.Len(t, result.CreateOperations, 2)
 		assert.Empty(t, result.SkipOperations)
-		assert.Empty(t, result.ConflictOperations)
+		assert.Empty(t, result.ForceLinkOperations)
+		assert.Empty(t, result.ForceTemplateOps)
 
 		// Check summary
 		assert.Contains(t, result.Summary, "2 total file operations")
@@ -229,10 +234,10 @@ func TestDryRun(t *testing.T) {
 
 func TestGenerateDryRunSummary(t *testing.T) {
 	result := &ValidateResult{
-		CreateOperations:   []FileOperation{{Type: OperationCreateLink}},
-		SkipOperations:     []FileOperation{{Type: OperationSkip}, {Type: OperationSkip}, {Type: OperationSkip}},
-		ConflictOperations: []FileOperation{{Type: OperationConflict}},
-		Errors:             []string{"error1"},
+		CreateOperations:    []FileOperation{{Type: OperationCreateLink}},
+		SkipOperations:      []FileOperation{{Type: OperationSkip}, {Type: OperationSkip}, {Type: OperationSkip}},
+		ForceLinkOperations: []FileOperation{{Type: OperationForceLink}},
+		Errors:              []string{"error1"},
 	}
 
 	summary := generateValidationSummary(result, false)
@@ -319,10 +324,11 @@ func TestDryRunWithComplexSetup(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, result)
 
-	assert.False(t, result.IsValid)             // Due to conflicts
-	assert.Len(t, result.CreateOperations, 2)   // new.txt + old.txt
-	assert.Len(t, result.SkipOperations, 1)     // correct.txt (already correct)
-	assert.Len(t, result.ConflictOperations, 2) // update.txt (wrong symlink) + conflict.txt (existing file)
+	assert.False(t, result.IsValid)              // Due to conflicts
+	assert.Len(t, result.CreateOperations, 2)    // new.txt + old.txt
+	assert.Len(t, result.SkipOperations, 1)      // correct.txt (already correct)
+	assert.Len(t, result.ForceLinkOperations, 2) // update.txt (wrong symlink) + conflict.txt (existing file)
+	assert.Len(t, result.ForceTemplateOps, 0)
 
 	// Verify summary
 	assert.Contains(t, result.Summary, "5 total file operations")

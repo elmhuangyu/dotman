@@ -95,7 +95,7 @@ func validateFileMapping(source, target string, isTemplate bool, vars map[string
 	// For now, treat existing files as conflicts (will be handled by force mode)
 	if isTemplate {
 		return FileOperation{
-			Type:        OperationConflict,
+			Type:        OperationForceTemplate,
 			Source:      source,
 			Target:      target,
 			Description: "target exists as file (template would overwrite)",
@@ -132,7 +132,7 @@ func validateFileMapping(source, target string, isTemplate bool, vars map[string
 		} else {
 			// Symlink exists but points to wrong file, treat as conflict
 			return FileOperation{
-				Type:        OperationConflict,
+				Type:        OperationForceLink,
 				Source:      source,
 				Target:      target,
 				Description: fmt.Sprintf("target exists as symlink pointing to wrong file: %s", currentTarget),
@@ -141,7 +141,7 @@ func validateFileMapping(source, target string, isTemplate bool, vars map[string
 	} else {
 		// Target exists but is not a symlink
 		return FileOperation{
-			Type:        OperationConflict,
+			Type:        OperationForceLink,
 			Source:      source,
 			Target:      target,
 			Description: "target exists as regular file",

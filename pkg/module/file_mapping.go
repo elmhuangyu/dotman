@@ -41,7 +41,8 @@ type OperationType string
 const (
 	OperationCreateLink     OperationType = "create_link"
 	OperationCreateTemplate OperationType = "create_template"
-	OperationConflict       OperationType = "conflict"
+	OperationForceLink      OperationType = "force_link"
+	OperationForceTemplate  OperationType = "force_template"
 	OperationSkip           OperationType = "skip"
 )
 

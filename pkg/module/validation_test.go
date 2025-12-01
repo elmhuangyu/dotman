@@ -55,7 +55,7 @@ func TestValidateFileMapping(t *testing.T) {
 
 		operation, err := validateFileMapping(sourceFile, targetFile, false, map[string]string{})
 		require.NoError(t, err)
-		assert.Equal(t, OperationConflict, operation.Type)
+		assert.Equal(t, OperationForceLink, operation.Type)
 		assert.Contains(t, operation.Description, "target exists as symlink pointing to wrong file")
 		assert.Contains(t, operation.Description, wrongSource)
 	})
@@ -69,8 +69,21 @@ func TestValidateFileMapping(t *testing.T) {
 
 		operation, err := validateFileMapping(sourceFile, targetFile, false, map[string]string{})
 		require.NoError(t, err)
-		assert.Equal(t, OperationConflict, operation.Type)
+		assert.Equal(t, OperationForceLink, operation.Type)
 		assert.Equal(t, "target exists as regular file", operation.Description)
+	})
+
+	t.Run("target exists as regular file (template)", func(t *testing.T) {
+		targetFile := filepath.Join(tempDir, "template_target.txt")
+
+		// Create regular file at target location
+		err := os.WriteFile(targetFile, []byte("existing content"), 0644)
+		require.NoError(t, err)
+
+		operation, err := validateFileMapping(sourceFile, targetFile, true, map[string]string{})
+		require.NoError(t, err)
+		assert.Equal(t, OperationForceTemplate, operation.Type)
+		assert.Equal(t, "target exists as file (template would overwrite)", operation.Description)
 	})
 
 	t.Run("source file does not exist", func(t *testing.T) {

@@ -63,7 +63,8 @@ func Install(modules []config.ModuleConfig, rootVars map[string]string, mkdir bo
 	}
 
 	// Check for conflicts in the operations
-	if len(validation.ConflictOperations) > 0 && !force {
+	forceOps := len(validation.ForceLinkOperations) + len(validation.ForceTemplateOps)
+	if forceOps > 0 && !force {
 		result.IsSuccess = false
 		result.Errors = append(result.Errors, "conflicts detected - installation would overwrite existing files")
 		result.Summary = "Installation failed: conflicts detected"
@@ -105,49 +106,6 @@ func Install(modules []config.ModuleConfig, rootVars map[string]string, mkdir bo
 		}
 	}
 
-	// Handle conflicts in force mode
-	if force {
-		for _, operation := range validation.ConflictOperations {
-			if isTemplateFile(filepath.Base(operation.Source)) {
-				// Handle template conflict
-				if err := backupAndCreateTemplateFile(operation.Source, operation.Target, rootVars, mkdir); err != nil {
-					result.IsSuccess = false
-					result.Errors = append(result.Errors, fmt.Sprintf("failed to backup and create template file %s -> %s: %v", operation.Source, operation.Target, err))
-				} else {
-					// Record successful template generation in state file
-					if stateFile != nil {
-						stateFile.AddFileMapping(operation.Source, operation.Target, state.TypeGenerated)
-						if err := saveStateFile(statePath, stateFile); err != nil {
-							log.Warn().Err(err).Msg("Failed to save state file for template")
-						}
-					}
-					result.CreatedTemplates = append(result.CreatedTemplates, operation)
-					log.Warn().Str("source", operation.Source).Str("target", operation.Target).Msg("Backed up existing file and created template file")
-				}
-			} else {
-				// Handle symlink conflict
-				if err := backupAndCreateSymlink(operation.Source, operation.Target, mkdir); err != nil {
-					result.IsSuccess = false
-					result.Errors = append(result.Errors, fmt.Sprintf("failed to backup and create symlink %s -> %s: %v", operation.Source, operation.Target, err))
-				} else {
-					// Record successful symlink in state file
-					if stateFile != nil {
-						stateFile.AddFileMapping(operation.Source, operation.Target, state.TypeLink)
-						if err := saveStateFile(statePath, stateFile); err != nil {
-							log.Warn().Err(err).Msg("Failed to save state file")
-						}
-					}
-					result.CreatedLinks = append(result.CreatedLinks, operation)
-					log.Warn().Str("source", operation.Source).Str("target", operation.Target).Msg("Backed up existing file and created symlink")
-				}
-			}
-
-			if !result.IsSuccess {
-				break
-			}
-		}
-	}
-
 	// Perform template file generation
 	for _, operation := range validation.CreateTemplateOps {
 		if err := createTemplateFile(operation.Source, operation.Target, rootVars, mkdir); err != nil {
@@ -167,6 +125,53 @@ func Install(modules []config.ModuleConfig, rootVars map[string]string, mkdir bo
 
 		if !result.IsSuccess {
 			break
+		}
+	}
+
+	// Handle force operations (both links and templates)
+	if force {
+		// Handle force link operations
+		for _, operation := range validation.ForceLinkOperations {
+			if err := backupAndCreateSymlink(operation.Source, operation.Target, mkdir); err != nil {
+				result.IsSuccess = false
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to backup and create symlink %s -> %s: %v", operation.Source, operation.Target, err))
+			} else {
+				// Record successful symlink in state file
+				if stateFile != nil {
+					stateFile.AddFileMapping(operation.Source, operation.Target, state.TypeLink)
+					if err := saveStateFile(statePath, stateFile); err != nil {
+						log.Warn().Err(err).Msg("Failed to save state file")
+					}
+				}
+				result.CreatedLinks = append(result.CreatedLinks, operation)
+				log.Warn().Str("source", operation.Source).Str("target", operation.Target).Msg("Backed up existing file and created symlink")
+			}
+
+			if !result.IsSuccess {
+				break
+			}
+		}
+
+		// Handle force template operations
+		for _, operation := range validation.ForceTemplateOps {
+			if err := backupAndCreateTemplateFile(operation.Source, operation.Target, rootVars, mkdir); err != nil {
+				result.IsSuccess = false
+				result.Errors = append(result.Errors, fmt.Sprintf("failed to backup and create template file %s -> %s: %v", operation.Source, operation.Target, err))
+			} else {
+				// Record successful template generation in state file
+				if stateFile != nil {
+					stateFile.AddFileMapping(operation.Source, operation.Target, state.TypeGenerated)
+					if err := saveStateFile(statePath, stateFile); err != nil {
+						log.Warn().Err(err).Msg("Failed to save state file for template")
+					}
+				}
+				result.CreatedTemplates = append(result.CreatedTemplates, operation)
+				log.Warn().Str("source", operation.Source).Str("target", operation.Target).Msg("Backed up existing file and created template file")
+			}
+
+			if !result.IsSuccess {
+				break
+			}
 		}
 	}
 

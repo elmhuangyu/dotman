@@ -35,8 +35,6 @@ type OperationResult struct {
 func Uninstall(dotfilesDir string) (*UninstallResult, error) {
 	log := logger.GetLogger()
 
-	log.Info().Str("dotfiles_dir", dotfilesDir).Msg("Starting uninstallation")
-
 	// Load state file
 	statePath := filepath.Join(dotfilesDir, "state.yaml")
 	stateFile, err := state.LoadStateFile(statePath)
@@ -52,7 +50,7 @@ func Uninstall(dotfilesDir string) (*UninstallResult, error) {
 		}, nil
 	}
 
-	log.Info().Int("tracked_files", len(stateFile.Files)).Msg("Loaded state file")
+	log.Debug().Int("tracked_files", len(stateFile.Files)).Msg("Loaded state file")
 
 	result := &UninstallResult{
 		IsSuccess: true,
@@ -96,7 +94,7 @@ func Uninstall(dotfilesDir string) (*UninstallResult, error) {
 		}
 
 		result.RemovedLinks = append(result.RemovedLinks, operation)
-		log.Info().Str("target", fileMapping.Target).Msg("Successfully removed symlink")
+		log.Debug().Str("target", fileMapping.Target).Msg("Successfully removed symlink")
 	}
 
 	// Process generated files
@@ -158,7 +156,7 @@ func Uninstall(dotfilesDir string) (*UninstallResult, error) {
 		}
 
 		result.RemovedGenerated = append(result.RemovedGenerated, operation)
-		log.Info().Str("target", fileMapping.Target).Msg("Successfully removed generated file")
+		log.Debug().Str("target", fileMapping.Target).Msg("Successfully removed generated file")
 	}
 
 	// Update state file to remove successfully uninstalled entries
@@ -186,15 +184,6 @@ func Uninstall(dotfilesDir string) (*UninstallResult, error) {
 			totalSkipped, len(result.SkippedLinks), len(result.SkippedGenerated),
 			len(result.BackedUpGenerated), len(result.FailedRemovals))
 	}
-
-	log.Info().Bool("success", result.IsSuccess).
-		Int("removed_links", len(result.RemovedLinks)).
-		Int("removed_generated", len(result.RemovedGenerated)).
-		Int("skipped_links", len(result.SkippedLinks)).
-		Int("skipped_generated", len(result.SkippedGenerated)).
-		Int("backed_up", len(result.BackedUpGenerated)).
-		Int("failed", len(result.FailedRemovals)).
-		Msg("Uninstall completed")
 
 	return result, nil
 }
@@ -437,6 +426,6 @@ func updateStateFile(statePath string, stateFile *state.StateFile, removedLinks 
 		return fmt.Errorf("failed to save updated state file: %w", err)
 	}
 
-	log.Info().Int("remaining_files", len(remainingFiles)).Msg("Updated state file")
+	log.Debug().Int("remaining_files", len(remainingFiles)).Msg("Updated state file")
 	return nil
 }

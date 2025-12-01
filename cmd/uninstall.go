@@ -56,14 +56,36 @@ func uninstall(dotfilesDir string) error {
 		}
 	}
 
+	// Log skipped generated files with reasons
+	if len(result.SkippedGenerated) > 0 {
+		log.Info().Int("skipped_count", len(result.SkippedGenerated)).Msg("Some generated files were skipped")
+		for _, skipped := range result.SkippedGenerated {
+			log.Info().
+				Str("target", skipped.Operation.Target).
+				Str("reason", skipped.Reason).
+				Msg("Skipped generated file removal")
+		}
+	}
+
+	// Log backed up generated files
+	if len(result.BackedUpGenerated) > 0 {
+		log.Warn().Int("backed_up_count", len(result.BackedUpGenerated)).Msg("Some generated files were backed up due to modifications")
+		for _, backedUp := range result.BackedUpGenerated {
+			log.Warn().
+				Str("target", backedUp.Operation.Target).
+				Str("reason", backedUp.Reason).
+				Msg("Backed up modified generated file")
+		}
+	}
+
 	// Log failed removals with reasons
 	if len(result.FailedRemovals) > 0 {
-		log.Error().Int("failed_count", len(result.FailedRemovals)).Msg("Some links failed to remove")
+		log.Error().Int("failed_count", len(result.FailedRemovals)).Msg("Some files failed to remove")
 		for _, failed := range result.FailedRemovals {
 			log.Error().
 				Str("target", failed.Operation.Target).
 				Str("reason", failed.Reason).
-				Msg("Failed symlink removal")
+				Msg("Failed file removal")
 		}
 	}
 

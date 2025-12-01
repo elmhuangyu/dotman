@@ -193,3 +193,15 @@ The system SHALL process files with `.dot-tmpl` extension as Go text templates a
 - **THEN** the system SHALL backup existing files with .bak extension
 - **AND** generate new template-rendered files to replace them
 
+#### Scenario: SHA1 calculation for generated files
+- **WHEN** a template file is successfully processed and generated
+- **THEN** the system SHALL calculate SHA1 hash of the generated file content
+- **AND** record the SHA1 hash in the state file mapping for integrity verification
+- **AND** store the hash as a hex-encoded string in the `sha1` field
+
+#### Scenario: State file SHA1 field population
+- **WHEN** recording generated file mappings in state file
+- **THEN** the system SHALL populate the `sha1` field with calculated hash
+- **AND** leave `sha1` field empty for link type mappings
+- **AND** ensure SHA1 calculation does not fail the installation process
+

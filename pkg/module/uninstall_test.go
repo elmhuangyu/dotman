@@ -1,6 +1,8 @@
 package module
 
 import (
+	"crypto/sha1"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -67,7 +69,7 @@ func TestUninstall(t *testing.T) {
 		assert.Len(t, result.SkippedLinks, 0)
 		assert.Len(t, result.FailedRemovals, 0)
 		assert.Len(t, result.Errors, 0)
-		assert.Contains(t, result.Summary, "2 symlinks removed")
+		assert.Contains(t, result.Summary, "2 files removed (2 symlinks, 0 generated)")
 
 		// Verify symlinks are removed
 		assert.NoFileExists(t, targetFile1)
@@ -413,14 +415,349 @@ func TestUninstallNonLinkFiles(t *testing.T) {
 		result, err := Uninstall(dotfilesDir)
 		require.NoError(t, err)
 		assert.True(t, result.IsSuccess)
-		assert.Len(t, result.RemovedLinks, 0) // No links should be removed
-		assert.Len(t, result.SkippedLinks, 1) // Link file should be skipped (target doesn't exist)
+		assert.Len(t, result.RemovedLinks, 0)     // No links should be removed
+		assert.Len(t, result.SkippedLinks, 1)     // Link file should be skipped (target doesn't exist)
+		assert.Len(t, result.SkippedGenerated, 1) // Generated file should be skipped (target doesn't exist)
 		assert.Len(t, result.FailedRemovals, 0)
 
-		// Verify state file contains both files (generated file is never processed, skipped link remains)
+		// Verify state file contains both files (both are skipped since targets don't exist)
 		updatedStateFile, err := state.LoadStateFile(statePath)
 		require.NoError(t, err)
 		require.NotNil(t, updatedStateFile)
 		assert.Len(t, updatedStateFile.Files, 2) // Both files should remain
+	})
+}
+
+func TestValidateGeneratedFile(t *testing.T) {
+	tempDir := t.TempDir()
+
+	t.Run("valid generated file with matching SHA1", func(t *testing.T) {
+		targetFile := filepath.Join(tempDir, "test.txt")
+		content := "test content"
+		err := os.WriteFile(targetFile, []byte(content), 0644)
+		require.NoError(t, err)
+
+		// Calculate expected SHA1
+		expectedSHA1 := calculateSHA1ForTest(content)
+
+		fileMapping := state.FileMapping{
+			Source: "/source",
+			Target: targetFile,
+			Type:   state.TypeGenerated,
+			SHA1:   expectedSHA1,
+		}
+
+		result := validateGeneratedFile(fileMapping)
+		assert.True(t, result.IsValid)
+		assert.False(t, result.BackupRequired)
+	})
+
+	t.Run("generated file with mismatched SHA1", func(t *testing.T) {
+		targetFile := filepath.Join(tempDir, "test.txt")
+		content := "modified content"
+		err := os.WriteFile(targetFile, []byte(content), 0644)
+		require.NoError(t, err)
+
+		fileMapping := state.FileMapping{
+			Source: "/source",
+			Target: targetFile,
+			Type:   state.TypeGenerated,
+			SHA1:   "different-sha1",
+		}
+
+		result := validateGeneratedFile(fileMapping)
+		assert.True(t, result.IsValid) // Valid for removal but backup required
+		assert.True(t, result.BackupRequired)
+	})
+
+	t.Run("generated file with empty SHA1 (backward compatibility)", func(t *testing.T) {
+		targetFile := filepath.Join(tempDir, "test.txt")
+		content := "test content"
+		err := os.WriteFile(targetFile, []byte(content), 0644)
+		require.NoError(t, err)
+
+		fileMapping := state.FileMapping{
+			Source: "/source",
+			Target: targetFile,
+			Type:   state.TypeGenerated,
+			SHA1:   "", // Empty SHA1
+		}
+
+		result := validateGeneratedFile(fileMapping)
+		assert.True(t, result.IsValid)
+		assert.False(t, result.BackupRequired)
+	})
+
+	t.Run("target file does not exist", func(t *testing.T) {
+		targetFile := filepath.Join(tempDir, "nonexistent.txt")
+
+		fileMapping := state.FileMapping{
+			Source: "/source",
+			Target: targetFile,
+			Type:   state.TypeGenerated,
+			SHA1:   "some-sha1",
+		}
+
+		result := validateGeneratedFile(fileMapping)
+		assert.False(t, result.IsValid)
+		assert.Equal(t, "target file does not exist", result.Reason)
+		assert.False(t, result.BackupRequired)
+	})
+
+	t.Run("target is not a regular file", func(t *testing.T) {
+		targetDir := filepath.Join(tempDir, "testdir")
+		err := os.Mkdir(targetDir, 0755)
+		require.NoError(t, err)
+
+		fileMapping := state.FileMapping{
+			Source: "/source",
+			Target: targetDir,
+			Type:   state.TypeGenerated,
+			SHA1:   "some-sha1",
+		}
+
+		result := validateGeneratedFile(fileMapping)
+		assert.False(t, result.IsValid)
+		assert.Equal(t, "target exists but is not a regular file", result.Reason)
+		assert.False(t, result.BackupRequired)
+	})
+}
+
+func TestCalculateSHA1(t *testing.T) {
+	tempDir := t.TempDir()
+
+	t.Run("calculate SHA1 for file", func(t *testing.T) {
+		targetFile := filepath.Join(tempDir, "test.txt")
+		content := "test content for SHA1"
+		err := os.WriteFile(targetFile, []byte(content), 0644)
+		require.NoError(t, err)
+
+		sha1, err := calculateSHA1(targetFile)
+		require.NoError(t, err)
+		assert.NotEmpty(t, sha1)
+
+		// Verify it's the correct SHA1
+		expectedSHA1 := calculateSHA1ForTest(content)
+		assert.Equal(t, expectedSHA1, sha1)
+	})
+
+	t.Run("file does not exist", func(t *testing.T) {
+		nonexistentFile := filepath.Join(tempDir, "nonexistent.txt")
+
+		_, err := calculateSHA1(nonexistentFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to open file")
+	})
+}
+
+func TestCreateBackup(t *testing.T) {
+	t.Run("create backup successfully", func(t *testing.T) {
+		tempDir := t.TempDir()
+		targetFile := filepath.Join(tempDir, "test.txt")
+		content := "test content"
+		err := os.WriteFile(targetFile, []byte(content), 0644)
+		require.NoError(t, err)
+
+		backupPath, err := createBackup(targetFile)
+		require.NoError(t, err)
+		assert.Equal(t, targetFile+".bak", backupPath)
+
+		// Verify backup content
+		backupContent, err := os.ReadFile(backupPath)
+		require.NoError(t, err)
+		assert.Equal(t, content, string(backupContent))
+	})
+
+	t.Run("handle existing backup file", func(t *testing.T) {
+		tempDir := t.TempDir()
+		targetFile := filepath.Join(tempDir, "test.txt")
+		content := "test content"
+		err := os.WriteFile(targetFile, []byte(content), 0644)
+		require.NoError(t, err)
+
+		// Create first backup
+		backupPath1, err := createBackup(targetFile)
+		require.NoError(t, err)
+		assert.Equal(t, targetFile+".bak", backupPath1)
+
+		// Create second backup (should get different name)
+		backupPath2, err := createBackup(targetFile)
+		require.NoError(t, err)
+		assert.Equal(t, targetFile+".bak.1", backupPath2)
+
+		// Both backups should exist
+		assert.FileExists(t, backupPath1)
+		assert.FileExists(t, backupPath2)
+	})
+
+	t.Run("source file does not exist", func(t *testing.T) {
+		tempDir := t.TempDir()
+		nonexistentFile := filepath.Join(tempDir, "nonexistent.txt")
+
+		_, err := createBackup(nonexistentFile)
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to open source file")
+	})
+}
+
+// Helper function to calculate SHA1 for test content
+func calculateSHA1ForTest(content string) string {
+	hasher := sha1.New()
+	hasher.Write([]byte(content))
+	return fmt.Sprintf("%x", hasher.Sum(nil))
+}
+
+func TestUninstallWithGeneratedFiles(t *testing.T) {
+	tempDir := t.TempDir()
+	dotfilesDir := filepath.Join(tempDir, "dotfiles")
+	targetDir := filepath.Join(tempDir, "target")
+
+	err := os.MkdirAll(dotfilesDir, 0755)
+	require.NoError(t, err)
+	err = os.MkdirAll(targetDir, 0755)
+	require.NoError(t, err)
+
+	t.Run("uninstall generated file with matching SHA1", func(t *testing.T) {
+		// Create a generated file
+		targetFile := filepath.Join(targetDir, "config.txt")
+		content := "generated content"
+		err := os.WriteFile(targetFile, []byte(content), 0644)
+		require.NoError(t, err)
+
+		// Calculate SHA1
+		sha1 := calculateSHA1ForTest(content)
+
+		// Create state file with generated file entry
+		stateFile := state.NewStateFile()
+		stateFile.AddFileMapping("/dotfiles/config.txt", targetFile, state.TypeGenerated)
+		// Manually set SHA1 since AddFileMapping calculates it for new files
+		if len(stateFile.Files) > 0 {
+			stateFile.Files[0].SHA1 = sha1
+		}
+
+		statePath := filepath.Join(dotfilesDir, "state.yaml")
+		err = state.SaveStateFile(statePath, stateFile)
+		require.NoError(t, err)
+
+		// Run uninstall
+		result, err := Uninstall(dotfilesDir)
+		require.NoError(t, err)
+		assert.True(t, result.IsSuccess)
+		assert.Len(t, result.RemovedGenerated, 1)
+		assert.Len(t, result.BackedUpGenerated, 0)
+		assert.Len(t, result.SkippedGenerated, 0)
+
+		// Verify file is removed
+		assert.NoFileExists(t, targetFile)
+
+		// Verify state file is updated
+		updatedStateFile, err := state.LoadStateFile(statePath)
+		require.NoError(t, err)
+		require.NotNil(t, updatedStateFile)
+		assert.Len(t, updatedStateFile.Files, 0)
+	})
+
+	t.Run("uninstall generated file with SHA1 mismatch creates backup", func(t *testing.T) {
+		// Create a generated file
+		targetFile := filepath.Join(targetDir, "modified.txt")
+		originalContent := "original content"
+		err := os.WriteFile(targetFile, []byte(originalContent), 0644)
+		require.NoError(t, err)
+
+		// Modify the file
+		modifiedContent := "modified content"
+		err = os.WriteFile(targetFile, []byte(modifiedContent), 0644)
+		require.NoError(t, err)
+
+		// Calculate SHA1 of original content
+		originalSHA1 := calculateSHA1ForTest(originalContent)
+
+		// Create state file with generated file entry
+		stateFile := state.NewStateFile()
+		stateFile.AddFileMapping("/dotfiles/modified.txt", targetFile, state.TypeGenerated)
+		// Manually set SHA1 to original
+		if len(stateFile.Files) > 0 {
+			stateFile.Files[0].SHA1 = originalSHA1
+		}
+
+		statePath := filepath.Join(dotfilesDir, "state.yaml")
+		err = state.SaveStateFile(statePath, stateFile)
+		require.NoError(t, err)
+
+		// Run uninstall
+		result, err := Uninstall(dotfilesDir)
+		require.NoError(t, err)
+		assert.True(t, result.IsSuccess)
+		assert.Len(t, result.RemovedGenerated, 0)
+		assert.Len(t, result.BackedUpGenerated, 1)
+		assert.Len(t, result.SkippedGenerated, 0)
+
+		// Verify backup is created
+		backupPath := targetFile + ".bak"
+		assert.FileExists(t, backupPath)
+
+		// Verify backup content is the modified content
+		backupContent, err := os.ReadFile(backupPath)
+		require.NoError(t, err)
+		assert.Equal(t, modifiedContent, string(backupContent))
+
+		// Verify original file still exists (modified files are not removed)
+		assert.FileExists(t, targetFile)
+
+		// Verify state file still contains the entry (backed up files remain)
+		updatedStateFile, err := state.LoadStateFile(statePath)
+		require.NoError(t, err)
+		require.NotNil(t, updatedStateFile)
+		assert.Len(t, updatedStateFile.Files, 1)
+	})
+
+	t.Run("uninstall mixed link and generated files", func(t *testing.T) {
+		// Create a symlink
+		sourceFile := filepath.Join(dotfilesDir, "link.txt")
+		err := os.WriteFile(sourceFile, []byte("link content"), 0644)
+		require.NoError(t, err)
+		targetLink := filepath.Join(targetDir, "link.txt")
+		err = os.Symlink(sourceFile, targetLink)
+		require.NoError(t, err)
+
+		// Create a generated file
+		targetGenerated := filepath.Join(targetDir, "generated.txt")
+		content := "generated content"
+		err = os.WriteFile(targetGenerated, []byte(content), 0644)
+		require.NoError(t, err)
+		sha1 := calculateSHA1ForTest(content)
+
+		// Create state file with both entries
+		stateFile := state.NewStateFile()
+		stateFile.AddFileMapping(sourceFile, targetLink, state.TypeLink)
+		stateFile.AddFileMapping("/dotfiles/generated.txt", targetGenerated, state.TypeGenerated)
+		// Set SHA1 for generated file
+		for i := range stateFile.Files {
+			if stateFile.Files[i].Type == state.TypeGenerated {
+				stateFile.Files[i].SHA1 = sha1
+			}
+		}
+
+		statePath := filepath.Join(dotfilesDir, "state.yaml")
+		err = state.SaveStateFile(statePath, stateFile)
+		require.NoError(t, err)
+
+		// Run uninstall
+		result, err := Uninstall(dotfilesDir)
+		require.NoError(t, err)
+		assert.True(t, result.IsSuccess)
+		assert.Len(t, result.RemovedLinks, 1)
+		assert.Len(t, result.RemovedGenerated, 1)
+		assert.Len(t, result.BackedUpGenerated, 0)
+
+		// Verify both files are removed
+		assert.NoFileExists(t, targetLink)
+		assert.NoFileExists(t, targetGenerated)
+
+		// Verify state file is empty
+		updatedStateFile, err := state.LoadStateFile(statePath)
+		require.NoError(t, err)
+		require.NotNil(t, updatedStateFile)
+		assert.Len(t, updatedStateFile.Files, 0)
 	})
 }

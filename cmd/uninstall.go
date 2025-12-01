@@ -17,7 +17,10 @@ This command cleans up configuration files installed by the install command.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		dotfilesDir := getDotfilesDir()
+		dotfilesDir, err := getDotfilesDir()
+		if err != nil {
+			return err
+		}
 		return uninstall(dotfilesDir)
 	},
 }

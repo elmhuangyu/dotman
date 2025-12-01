@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -19,7 +20,7 @@ var rootCmd = &cobra.Command{
 	Short: "A dotfile management and installation tool",
 	Long: `dotman is a CLI tool for managing and installing dotfiles.
 It provides commands to install and uninstall dotfile configurations.`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Set debug mode if flag is provided
 		if debugFlag {
 			logger.SetDebugMode()
@@ -27,7 +28,12 @@ It provides commands to install and uninstall dotfile configurations.`,
 
 		// Log startup info
 		log := logger.GetLogger()
-		log.Debug().Str("dotfiles_dir", getDotfilesDir())
+		_, err := getDotfilesDir()
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to determine dotfiles directory")
+			return err
+		}
+		return nil
 	},
 }
 
@@ -53,11 +59,15 @@ func init() {
 }
 
 // getDotfilesDir returns the dotfiles directory based on flag or default
-func getDotfilesDir() string {
+func getDotfilesDir() (string, error) {
 	if dirFlag != "" {
-		return dirFlag
+		return dirFlag, nil
 	}
-	return getDefaultDotfilesDir()
+	dir := getDefaultDotfilesDir()
+	if dir == "" {
+		return "", fmt.Errorf("no dotfiles directory found: neither ~/dotfiles nor ~/.config/dotfiles exist")
+	}
+	return dir, nil
 }
 
 // getDefaultDotfilesDir returns the default dotfiles directory
@@ -66,5 +76,18 @@ func getDefaultDotfilesDir() string {
 	if err != nil {
 		return "/tmp/dotfiles"
 	}
-	return filepath.Join(home, ".config", "dotfiles")
+
+	// Check if ~/dotfiles exists
+	dotfilesDir := filepath.Join(home, "dotfiles")
+	if info, err := os.Stat(dotfilesDir); err == nil && info.IsDir() {
+		return dotfilesDir
+	}
+
+	// Check if ~/.config/dotfiles exists
+	configDir := filepath.Join(home, ".config", "dotfiles")
+	if info, err := os.Stat(configDir); err == nil && info.IsDir() {
+		return configDir
+	}
+
+	return ""
 }

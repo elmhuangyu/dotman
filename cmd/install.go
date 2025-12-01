@@ -35,7 +35,10 @@ to ensure a clean state and prevent conflicts from previous installations.`,
 		return nil
 	},
 	RunE: func(cmd *cobra.Command, args []string) error {
-		dotfilesDir := getDotfilesDir()
+		dotfilesDir, err := getDotfilesDir()
+		if err != nil {
+			return err
+		}
 		return install(dotfilesDir, dryRunFlag, forceFlag, mkdirFlag)
 	},
 }

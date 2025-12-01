@@ -78,9 +78,27 @@ exclude_modules:
 ```
 
 **Root Configuration Fields:**
-- `vars`: Define variables that can be used in module configurations (currently for future templating support)
+- `vars`: Define variables that can be used in template files (.dot-tmpl)
 - `exclude_modules`: List of module directory names to skip during installation
 
+
+#### Template Files
+
+dotman supports template files with `.dot-tmpl` extension. These files are processed with Go templates and can use variables from the root configuration.
+
+Available template variables:
+- `{{.DONT_EDIT}}`: A warning message indicating the file is generated and should not be edited
+- `{{.ORIGINAL_FILE_PATH}}`: The absolute path to the original template file
+
+Example template file:
+
+```bash
+# {{.DONT_EDIT}}
+# {{.ORIGINAL_FILE_PATH}}
+
+user_name = "{{.USER}}"
+home_dir = "{{.HOME}}"
+```
 
 #### Dotfile Configuration Format
 

@@ -137,8 +137,9 @@ exclude_modules:
 				return &Config{
 					RootConfig: RootConfig{
 						Vars: map[string]string{
-							"USERNAME": "john",
-							"HOMEDIR":  "/home/john",
+							"USERNAME":  "john",
+							"HOMEDIR":   "/home/john",
+							"DONT_EDIT": "!!! THIS FILE IS GENERATED. DON'T EDIT THIS FILE !!!",
 						},
 						ExcludeModules: []string{"temp", "backup"},
 					},
@@ -169,7 +170,9 @@ exclude_modules: []`), 0644)
 			wantConfig: func(tmpDir string) *Config {
 				return &Config{
 					RootConfig: RootConfig{
-						Vars:           map[string]string{},
+						Vars: map[string]string{
+							"DONT_EDIT": "!!! THIS FILE IS GENERATED. DON'T EDIT THIS FILE !!!",
+						},
 						ExcludeModules: []string{},
 					},
 					Modules: []ModuleConfig{
@@ -207,7 +210,9 @@ exclude_modules:
 			wantConfig: func(tmpDir string) *Config {
 				return &Config{
 					RootConfig: RootConfig{
-						Vars:           map[string]string{},
+						Vars: map[string]string{
+							"DONT_EDIT": "!!! THIS FILE IS GENERATED. DON'T EDIT THIS FILE !!!",
+						},
 						ExcludeModules: []string{"excluded-module", "test-module"},
 					},
 					Modules: []ModuleConfig{

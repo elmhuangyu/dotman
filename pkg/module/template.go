@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"os"
+	"path/filepath"
 	"text/template"
 )
 
@@ -14,6 +15,13 @@ func RenderTemplate(templatePath string, vars map[string]string) ([]byte, error)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read template file %s: %w", templatePath, err)
 	}
+
+	// Get absolute path for ORIGINAL_FILE_PATH variable
+	absPath, err := filepath.Abs(templatePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get absolute path for %s: %w", templatePath, err)
+	}
+	vars["ORIGINAL_FILE_PATH"] = fmt.Sprintf("Original file: %s", absPath)
 
 	// Parse the template with missingkey=error option
 	tmpl, err := template.New("template").Option("missingkey=error").Parse(string(templateContent))
@@ -37,6 +45,13 @@ func ValidateTemplate(templatePath string, vars map[string]string) error {
 	if err != nil {
 		return fmt.Errorf("failed to read template file %s: %w", templatePath, err)
 	}
+
+	// Get absolute path for ORIGINAL_FILE_PATH variable
+	absPath, err := filepath.Abs(templatePath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for %s: %w", templatePath, err)
+	}
+	vars["ORIGINAL_FILE_PATH"] = fmt.Sprintf("Original file: %s", absPath)
 
 	// Parse the template to check syntax
 	tmpl, err := template.New("template").Option("missingkey=error").Parse(string(templateContent))

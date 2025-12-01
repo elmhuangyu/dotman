@@ -1,6 +1,9 @@
 # Example configuration template
 # This file demonstrates template functionality
 
+# {{.DONT_EDIT}}
+# {{.ORIGINAL_FILE_PATH}}
+
 user_name = "{{.USER}}"
 home_dir = "{{.HOME}}"
 shell = "{{.SHELL}}"

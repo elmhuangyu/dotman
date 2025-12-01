@@ -37,8 +37,9 @@ exclude_modules: []`), 0644)
 			},
 			wantConfig: RootConfig{
 				Vars: map[string]string{
-					"USERNAME": "john",
-					"HOMEDIR":  "/home/john",
+					"USERNAME":  "john",
+					"HOMEDIR":   "/home/john",
+					"DONT_EDIT": "!!! THIS FILE IS GENERATED. DON'T EDIT THIS FILE !!!",
 				},
 				ExcludeModules: []string{},
 			},
@@ -62,7 +63,9 @@ exclude_modules:
 				return dir
 			},
 			wantConfig: RootConfig{
-				Vars: map[string]string{},
+				Vars: map[string]string{
+					"DONT_EDIT": "!!! THIS FILE IS GENERATED. DON'T EDIT THIS FILE !!!",
+				},
 				ExcludeModules: []string{
 					"nvim",
 					"bash",
@@ -83,7 +86,9 @@ exclude_modules: []`), 0644)
 				return dir
 			},
 			wantConfig: RootConfig{
-				Vars:           map[string]string{},
+				Vars: map[string]string{
+					"DONT_EDIT": "!!! THIS FILE IS GENERATED. DON'T EDIT THIS FILE !!!",
+				},
 				ExcludeModules: []string{},
 			},
 			wantErr: false,
@@ -203,9 +208,10 @@ exclude_modules:
 			},
 			wantConfig: RootConfig{
 				Vars: map[string]string{
-					"USERNAME": "alice",
-					"VERSION":  "1.0.0",
-					"DEBUG123": "true",
+					"USERNAME":  "alice",
+					"VERSION":   "1.0.0",
+					"DEBUG123":  "true",
+					"DONT_EDIT": "!!! THIS FILE IS GENERATED. DON'T EDIT THIS FILE !!!",
 				},
 				ExcludeModules: []string{
 					"my-module",
@@ -285,15 +291,14 @@ func TestValidateRootConfig(t *testing.T) {
 			errContains: "vars key 'USER-NAME' contains invalid characters",
 		},
 		{
-			name: "InvalidVarKeyWithUnderscore",
+			name: "ValidVarKeyWithUnderscore",
 			config: RootConfig{
 				Vars: map[string]string{
 					"USER_NAME": "john",
 				},
 				ExcludeModules: []string{},
 			},
-			wantErr:     true,
-			errContains: "vars key 'USER_NAME' contains invalid characters",
+			wantErr: false,
 		},
 		{
 			name: "InvalidVarKeyWithDot",

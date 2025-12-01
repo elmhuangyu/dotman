@@ -36,6 +36,10 @@ func LoadRootConfig(dir string) (RootConfig, error) {
 		return RootConfig{}, fmt.Errorf("failed to parse root config file %s: %w", configPath, err)
 	}
 
+	if _, ok := config.Vars["DONT_EDIT"]; !ok {
+		config.Vars["DONT_EDIT"] = "!!! THIS FILE IS GENERATED. DON'T EDIT THIS FILE !!!"
+	}
+
 	// Validate config
 	if err := config.validate(); err != nil {
 		return RootConfig{}, fmt.Errorf("invalid root config in %s: %w", configPath, err)
@@ -46,8 +50,8 @@ func LoadRootConfig(dir string) (RootConfig, error) {
 
 // validate validates the root configuration structure and values
 func (config *RootConfig) validate() error {
-	// Validate vars keys - only alphanumeric characters allowed
-	varKeyPattern := regexp.MustCompile(`^[a-zA-Z0-9]+$`)
+	// Validate vars keys - alphanumeric and underscore characters allowed
+	varKeyPattern := regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 	for key := range config.Vars {
 		if !varKeyPattern.MatchString(key) {
 			return fmt.Errorf("vars key '%s' contains invalid characters, only a-zA-Z0-9 are allowed", key)

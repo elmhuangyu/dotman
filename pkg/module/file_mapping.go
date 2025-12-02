@@ -131,42 +131,56 @@ func BuildFileMapping(modules []config.ModuleConfig) (*FileMapping, error) {
 func buildModuleMapping(module config.ModuleConfig) (*FileMapping, error) {
 	mapping := NewFileMapping()
 
-	// Get all files in module directory
-	entries, err := os.ReadDir(module.Dir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read module directory %s: %w", module.Dir, err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue // Skip subdirectories for now
+	// Walk through all files in module directory recursively
+	err := filepath.WalkDir(module.Dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
 		}
 
-		sourceFile := filepath.Join(module.Dir, entry.Name())
+		// Skip the root directory itself
+		if path == module.Dir {
+			return nil
+		}
+
+		// Skip directories (but continue walking into them)
+		if entry.IsDir() {
+			return nil
+		}
 
 		// Skip if file is in ignores list
-		if isIgnored(entry.Name(), module.Ignores) {
-			continue
+		relPath, err := filepath.Rel(module.Dir, path)
+		if err != nil {
+			return fmt.Errorf("failed to get relative path for %s: %w", path, err)
+		}
+
+		if isIgnored(relPath, module.Ignores) {
+			return nil
 		}
 
 		// Skip Dotfile config file
 		if entry.Name() == "Dotfile" {
-			continue
+			return nil
 		}
 
-		// Calculate target path
-		targetName := entry.Name()
+		// Calculate target path, preserving subdirectory structure
+		targetName := relPath
 		if isTemplateFile(entry.Name()) {
 			// Remove .dot-tmpl extension for target filename
-			targetName = strings.TrimSuffix(entry.Name(), ".dot-tmpl")
+			targetName = strings.TrimSuffix(relPath, ".dot-tmpl")
 		}
 		targetFile := filepath.Join(module.TargetDir, targetName)
 
 		if isTemplateFile(entry.Name()) {
-			mapping.AddTemplateMapping(sourceFile, targetFile)
+			mapping.AddTemplateMapping(path, targetFile)
 		} else {
-			mapping.AddMapping(sourceFile, targetFile)
+			mapping.AddMapping(path, targetFile)
 		}
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to walk module directory %s: %w", module.Dir, err)
 	}
 
 	return mapping, nil

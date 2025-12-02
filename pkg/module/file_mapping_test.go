@@ -340,3 +340,179 @@ func TestIsTemplateFile(t *testing.T) {
 		})
 	}
 }
+
+func TestBuildModuleMappingWithSubdirectories(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create test module structure with subdirectories
+	moduleDir := filepath.Join(tempDir, "test_module")
+	err := os.MkdirAll(moduleDir, 0755)
+	require.NoError(t, err)
+
+	// Create files in root directory
+	err = os.WriteFile(filepath.Join(moduleDir, "root1.txt"), []byte("root content 1"), 0644)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(moduleDir, "root2.txt"), []byte("root content 2"), 0644)
+	require.NoError(t, err)
+
+	// Create subdirectory with files
+	subDir1 := filepath.Join(moduleDir, "subdir1")
+	err = os.MkdirAll(subDir1, 0755)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(subDir1, "sub1.txt"), []byte("sub content 1"), 0644)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(subDir1, "sub1.dot-tmpl"), []byte("template content 1"), 0644)
+	require.NoError(t, err)
+
+	// Create nested subdirectory
+	nestedDir := filepath.Join(moduleDir, "subdir1", "nested")
+	err = os.MkdirAll(nestedDir, 0755)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(nestedDir, "nested.txt"), []byte("nested content"), 0644)
+	require.NoError(t, err)
+
+	// Create another subdirectory
+	subDir2 := filepath.Join(moduleDir, "subdir2")
+	err = os.MkdirAll(subDir2, 0755)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(subDir2, "sub2.txt"), []byte("sub content 2"), 0644)
+	require.NoError(t, err)
+
+	// Create Dotfile config
+	dotfileContent := `target_dir: "/home/user/.config/test"
+`
+	err = os.WriteFile(filepath.Join(moduleDir, "Dotfile"), []byte(dotfileContent), 0644)
+	require.NoError(t, err)
+
+	// Load module config
+	moduleConfig, err := config.LoadConfig(moduleDir)
+	require.NoError(t, err)
+	require.NotNil(t, moduleConfig)
+
+	// Build mapping for single module
+	mapping, err := buildModuleMapping(*moduleConfig)
+	require.NoError(t, err)
+	require.NotNil(t, mapping)
+
+	// Check that all files (including subdirectories) are mapped
+	allMappings := mapping.GetAllMappings()
+
+	// We should have 6 files (root1.txt, root2.txt, sub1.txt, sub1.dot-tmpl, nested.txt, sub2.txt)
+	// Dotfile should be excluded
+	assert.Len(t, allMappings, 6, "Should map all files including subdirectories, excluding Dotfile")
+
+	// Check specific mappings for root files
+	root1Source := filepath.Join(moduleDir, "root1.txt")
+	target1, exists := mapping.GetTarget(root1Source)
+	assert.True(t, exists, "root1.txt should be mapped")
+	assert.Equal(t, "/home/user/.config/test/root1.txt", target1)
+
+	root2Source := filepath.Join(moduleDir, "root2.txt")
+	target2, exists := mapping.GetTarget(root2Source)
+	assert.True(t, exists, "root2.txt should be mapped")
+	assert.Equal(t, "/home/user/.config/test/root2.txt", target2)
+
+	// Check specific mappings for subdirectory files
+	sub1Source := filepath.Join(moduleDir, "subdir1", "sub1.txt")
+	target3, exists := mapping.GetTarget(sub1Source)
+	assert.True(t, exists, "subdir1/sub1.txt should be mapped")
+	assert.Equal(t, "/home/user/.config/test/subdir1/sub1.txt", target3)
+
+	nestedSource := filepath.Join(moduleDir, "subdir1", "nested", "nested.txt")
+	target4, exists := mapping.GetTarget(nestedSource)
+	assert.True(t, exists, "subdir1/nested/nested.txt should be mapped")
+	assert.Equal(t, "/home/user/.config/test/subdir1/nested/nested.txt", target4)
+
+	sub2Source := filepath.Join(moduleDir, "subdir2", "sub2.txt")
+	target5, exists := mapping.GetTarget(sub2Source)
+	assert.True(t, exists, "subdir2/sub2.txt should be mapped")
+	assert.Equal(t, "/home/user/.config/test/subdir2/sub2.txt", target5)
+
+	// Check template file mapping
+	templateSource := filepath.Join(moduleDir, "subdir1", "sub1.dot-tmpl")
+	templateTarget, exists := mapping.GetTarget(templateSource)
+	assert.True(t, exists, "subdir1/sub1.dot-tmpl should be mapped")
+	assert.Equal(t, "/home/user/.config/test/subdir1/sub1", templateTarget) // .dot-tmpl extension removed
+
+	// Check template detection
+	assert.True(t, mapping.IsTemplate(templateSource), "Template file should be detected as template")
+
+	// Check that regular files are not templates
+	assert.False(t, mapping.IsTemplate(root1Source), "Regular file should not be detected as template")
+}
+
+func TestBuildModuleMappingWithSubdirectoriesAndIgnores(t *testing.T) {
+	tempDir := t.TempDir()
+
+	// Create test module structure with subdirectories
+	moduleDir := filepath.Join(tempDir, "test_module")
+	err := os.MkdirAll(moduleDir, 0755)
+	require.NoError(t, err)
+
+	// Create files in root directory
+	err = os.WriteFile(filepath.Join(moduleDir, "root1.txt"), []byte("root content 1"), 0644)
+	require.NoError(t, err)
+
+	// Create subdirectory with files
+	subDir1 := filepath.Join(moduleDir, "subdir1")
+	err = os.MkdirAll(subDir1, 0755)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(subDir1, "important.txt"), []byte("important content"), 0644)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(subDir1, "ignore_me.txt"), []byte("ignore content"), 0644)
+	require.NoError(t, err)
+
+	// Create another subdirectory that should be ignored
+	ignoreDir := filepath.Join(moduleDir, "ignore_dir")
+	err = os.MkdirAll(ignoreDir, 0755)
+	require.NoError(t, err)
+	err = os.WriteFile(filepath.Join(ignoreDir, "file.txt"), []byte("should be ignored"), 0644)
+	require.NoError(t, err)
+
+	// Create Dotfile config with ignore patterns
+	dotfileContent := `target_dir: "/home/user/.config/test"
+ignores:
+  - "ignore_me.txt"
+  - "ignore_dir"
+`
+	err = os.WriteFile(filepath.Join(moduleDir, "Dotfile"), []byte(dotfileContent), 0644)
+	require.NoError(t, err)
+
+	// Load module config
+	moduleConfig, err := config.LoadConfig(moduleDir)
+	require.NoError(t, err)
+	require.NotNil(t, moduleConfig)
+
+	// Build mapping for single module
+	mapping, err := buildModuleMapping(*moduleConfig)
+	require.NoError(t, err)
+	require.NotNil(t, mapping)
+
+	// Check that only non-ignored files are mapped
+	allMappings := mapping.GetAllMappings()
+
+	// We should have 2 files: root1.txt and subdir1/important.txt
+	// ignore_me.txt, ignore_dir/file.txt, and Dotfile should be excluded
+	assert.Len(t, allMappings, 2, "Should only map non-ignored files")
+
+	// Check that root1.txt is mapped
+	root1Source := filepath.Join(moduleDir, "root1.txt")
+	target1, exists := mapping.GetTarget(root1Source)
+	assert.True(t, exists, "root1.txt should be mapped")
+	assert.Equal(t, "/home/user/.config/test/root1.txt", target1)
+
+	// Check that subdir1/important.txt is mapped
+	importantSource := filepath.Join(moduleDir, "subdir1", "important.txt")
+	target2, exists := mapping.GetTarget(importantSource)
+	assert.True(t, exists, "subdir1/important.txt should be mapped")
+	assert.Equal(t, "/home/user/.config/test/subdir1/important.txt", target2)
+
+	// Check that ignored files are not mapped
+	ignoreMeSource := filepath.Join(moduleDir, "subdir1", "ignore_me.txt")
+	_, exists = mapping.GetTarget(ignoreMeSource)
+	assert.False(t, exists, "ignore_me.txt should not be mapped")
+
+	ignoreFileSource := filepath.Join(moduleDir, "ignore_dir", "file.txt")
+	_, exists = mapping.GetTarget(ignoreFileSource)
+	assert.False(t, exists, "ignore_dir/file.txt should not be mapped")
+}

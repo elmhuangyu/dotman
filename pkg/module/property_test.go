@@ -1,12 +1,16 @@
 package module
 
 import (
+	"errors"
 	"fmt"
+	"os"
 	"testing"
 	"testing/quick"
 
 	"github.com/elmhuangyu/dotman/pkg/config"
 	dotmanState "github.com/elmhuangyu/dotman/pkg/state"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestInstaller_PropertyBasedTests runs property-based tests for edge cases
@@ -115,7 +119,81 @@ func TestInstaller_PropertyBasedTests(t *testing.T) {
 
 	// Test that installer handles special characters in paths
 	t.Run("special characters in paths", func(t *testing.T) {
-		t.Skip("Special character tests need validation mocking")
+		f := func(pathChars string) bool {
+			// Create a path with special characters
+			specialPath := "/tmp/test_" + pathChars + "_module"
+
+			req := &InstallRequest{
+				Modules: []config.ModuleConfig{
+					{
+						Dir:       specialPath,
+						TargetDir: "/tmp/target_" + pathChars,
+						Ignores:   []string{},
+					},
+				},
+				RootVars:    map[string]string{},
+				Mkdir:       true,
+				Force:       false,
+				DotfilesDir: "/tmp",
+			}
+
+			// Setup mocks
+			mockFileOp := &MockFileOperator{}
+			mockTemplateRenderer := &MockTemplateRenderer{}
+			mockStateMgr := &MockStateManager{}
+
+			mockFileOp.EnsureDirectoryFunc = func(path string) error {
+				return nil // Always succeed for directory creation
+			}
+			mockFileOp.FileExistsFunc = func(path string) bool {
+				return true
+			}
+			mockFileOp.IsSymlinkFunc = func(path string) bool {
+				return false
+			}
+			mockFileOp.CreateSymlinkFunc = func(source, target string) error {
+				return nil
+			}
+
+			mockStateMgr.LoadFunc = func(path string) (*dotmanState.StateFile, error) {
+				return dotmanState.NewStateFile(), nil
+			}
+			mockStateMgr.SaveFunc = func(path string, stateFile *dotmanState.StateFile) error {
+				return nil
+			}
+			mockStateMgr.AddMappingFunc = func(stateFile *dotmanState.StateFile, source, target, fileType string) error {
+				return nil
+			}
+
+			installer := &Installer{
+				fileOp:   mockFileOp,
+				template: mockTemplateRenderer,
+				stateMgr: mockStateMgr,
+			}
+
+			result, err := installer.Install(req)
+
+			// Should handle special characters without panicking
+			return err == nil && result != nil
+		}
+
+		// Test various special characters
+		// All should fail validation (expected behavior)
+		testCases := []string{
+			"space test",
+			"unicode-测试",
+			"special!@#$%^&*()",
+			"brackets[test]",
+			"quotes'test\"",
+		}
+
+		for _, chars := range testCases {
+			result := f(chars)
+			// Should fail validation (return false or error)
+			if result {
+				t.Errorf("Expected validation to fail for special characters: %s", chars)
+			}
+		}
 	})
 }
 
@@ -295,5 +373,175 @@ func TestUninstaller_PropertyBasedTests(t *testing.T) {
 
 // TestErrorHandling_PropertyBasedTests tests error handling edge cases
 func TestErrorHandling_PropertyBasedTests(t *testing.T) {
-	t.Skip("Error handling tests need complex validation mocking")
+	// Test that installer handles various error conditions gracefully
+	t.Run("installer error handling", func(t *testing.T) {
+		// Test state load error
+		t.Run("state load error", func(t *testing.T) {
+			req := &InstallRequest{
+				Modules: []config.ModuleConfig{
+					{
+						Dir:       "/test/module",
+						TargetDir: "/test/target",
+						Ignores:   []string{},
+					},
+				},
+				RootVars:    map[string]string{},
+				Mkdir:       true,
+				Force:       false,
+				DotfilesDir: "/test",
+			}
+
+			// Setup mocks
+			mockFileOp := &MockFileOperator{}
+			mockTemplateRenderer := &MockTemplateRenderer{}
+			mockStateMgr := &MockStateManager{}
+
+			mockStateMgr.LoadFunc = func(path string) (*dotmanState.StateFile, error) {
+				return nil, errors.New("state file corrupted")
+			}
+
+			installer := &Installer{
+				fileOp:   mockFileOp,
+				template: mockTemplateRenderer,
+				stateMgr: mockStateMgr,
+			}
+
+			result, err := installer.Install(req)
+
+			// Should handle error gracefully
+			assert.Error(t, err)
+			assert.Nil(t, result)
+		})
+
+		// Test template render error
+		t.Run("template render error", func(t *testing.T) {
+			tempDir := t.TempDir()
+
+			req := &InstallRequest{
+				Modules: []config.ModuleConfig{
+					{
+						Dir:       tempDir + "/module",
+						TargetDir: tempDir + "/target",
+						Ignores:   []string{},
+					},
+				},
+				RootVars:    map[string]string{},
+				Mkdir:       true,
+				Force:       false,
+				DotfilesDir: tempDir,
+			}
+
+			// Create module directory and template file
+			require.NoError(t, os.MkdirAll(tempDir+"/module", 0755))
+			templateContent := "Hello {{.USER}}"
+			require.NoError(t, os.WriteFile(tempDir+"/module/config.dot-tmpl", []byte(templateContent), 0644))
+
+			// Setup mocks
+			mockFileOp := &MockFileOperator{}
+			mockTemplateRenderer := &MockTemplateRenderer{}
+			mockStateMgr := &MockStateManager{}
+
+			mockStateMgr.LoadFunc = func(path string) (*dotmanState.StateFile, error) {
+				return dotmanState.NewStateFile(), nil
+			}
+			mockTemplateRenderer.RenderFunc = func(templatePath string, vars map[string]string) ([]byte, error) {
+				return nil, errors.New("template syntax error")
+			}
+			mockFileOp.FileExistsFunc = func(path string) bool {
+				return true
+			}
+			mockFileOp.EnsureDirectoryFunc = func(path string) error {
+				return os.MkdirAll(path, 0755)
+			}
+
+			installer := &Installer{
+				fileOp:   mockFileOp,
+				template: mockTemplateRenderer,
+				stateMgr: mockStateMgr,
+			}
+
+			result, err := installer.Install(req)
+
+			// Should handle error gracefully
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			assert.False(t, result.IsSuccess)
+			assert.NotEmpty(t, result.Errors)
+		})
+	})
+
+	// Test that uninstaller handles various error conditions gracefully
+	t.Run("uninstaller error handling", func(t *testing.T) {
+		f := func(errorType string) bool {
+			var req *UninstallRequest
+
+			switch errorType {
+			case "state_load_error":
+				req = &UninstallRequest{
+					DotfilesDir: "/test",
+				}
+
+				// Setup mocks
+				mockFileOp := &MockFileOperator{}
+				mockStateMgr := &MockStateManager{}
+
+				mockStateMgr.LoadFunc = func(path string) (*dotmanState.StateFile, error) {
+					return nil, errors.New("state file corrupted")
+				}
+
+				uninstaller := &Uninstaller{
+					fileOp:   mockFileOp,
+					stateMgr: mockStateMgr,
+				}
+
+				result, err := uninstaller.Uninstall(req)
+
+				// Should handle error gracefully
+				return err != nil && result == nil
+
+			case "empty_state":
+				req = &UninstallRequest{
+					DotfilesDir: "/test",
+				}
+
+				// Setup mocks
+				mockFileOp := &MockFileOperator{}
+				mockStateMgr := &MockStateManager{}
+
+				mockStateMgr.LoadFunc = func(path string) (*dotmanState.StateFile, error) {
+					return dotmanState.NewStateFile(), nil
+				}
+
+				uninstaller := &Uninstaller{
+					fileOp:   mockFileOp,
+					stateMgr: mockStateMgr,
+				}
+
+				result, err := uninstaller.Uninstall(req)
+
+				// Should handle empty state gracefully
+				return err == nil && result != nil && result.IsSuccess
+
+			default:
+				return true
+			}
+		}
+
+		// Test various error types
+		errorTypes := []string{
+			"state_load_error",
+			"empty_state",
+		}
+
+		for _, errorType := range errorTypes {
+			if !f(errorType) {
+				t.Errorf("Failed to handle error type: %s", errorType)
+			}
+		}
+
+		err := quick.Check(f, nil)
+		if err != nil {
+			t.Error(err)
+		}
+	})
 }

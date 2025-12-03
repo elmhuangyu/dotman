@@ -2,6 +2,7 @@ package module
 
 import (
 	dotmanState "github.com/elmhuangyu/dotman/pkg/state"
+	"os"
 )
 
 // MockFileOperator is a mock implementation of filesystem.FileOperator
@@ -14,6 +15,7 @@ type MockFileOperator struct {
 	FileExistsFunc      func(path string) bool
 	IsSymlinkFunc       func(path string) bool
 	ReadlinkFunc        func(path string) (string, error)
+	WriteFileFunc       func(path string, data []byte, perm os.FileMode) error
 }
 
 func (m *MockFileOperator) CreateSymlink(source, target string) error {
@@ -70,6 +72,13 @@ func (m *MockFileOperator) Readlink(path string) (string, error) {
 		return m.ReadlinkFunc(path)
 	}
 	return "", nil
+}
+
+func (m *MockFileOperator) WriteFile(path string, data []byte, perm os.FileMode) error {
+	if m.WriteFileFunc != nil {
+		return m.WriteFileFunc(path, data, perm)
+	}
+	return nil
 }
 
 // MockTemplateRenderer is a mock implementation of template.TemplateRenderer

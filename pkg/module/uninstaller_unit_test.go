@@ -413,7 +413,6 @@ func TestUninstaller_Uninstall(t *testing.T) {
 
 			// Create hybrid file operators for both symlink and backup operations
 			hybridSymlinkOp := &MockFileOperator{}
-			hybridBackupOp := &MockFileOperator{}
 			realFileOp := filesystem.NewOperator()
 
 			// Set up hybrid file operators to delegate to real operator by default
@@ -421,10 +420,6 @@ func TestUninstaller_Uninstall(t *testing.T) {
 			hybridSymlinkOp.IsSymlinkFunc = realFileOp.IsSymlink
 			hybridSymlinkOp.ReadlinkFunc = realFileOp.Readlink
 			hybridSymlinkOp.RemoveFileFunc = realFileOp.RemoveFile
-
-			hybridBackupOp.FileExistsFunc = realFileOp.FileExists
-			hybridBackupOp.CreateBackupFunc = realFileOp.CreateBackup
-			hybridBackupOp.RemoveFileFunc = realFileOp.RemoveFile
 
 			// Apply test-specific mocks
 			tt.setupMocks(hybridSymlinkOp, mockStateMgr)
@@ -454,7 +449,8 @@ func TestUninstaller_Uninstall(t *testing.T) {
 				stateFile.Files[i].Source = tempDir + originalSource
 				stateFile.Files[i].Target = tempDir + originalTarget
 
-				if stateFile.Files[i].Type == dotmanState.TypeLink {
+				switch stateFile.Files[i].Type {
+				case dotmanState.TypeLink:
 					// Create symlink
 					sourcePath := stateFile.Files[i].Source
 					targetPath := stateFile.Files[i].Target
@@ -470,7 +466,7 @@ func TestUninstaller_Uninstall(t *testing.T) {
 					err := os.Symlink(sourcePath, targetPath)
 					require.NoError(t, err)
 
-				} else if stateFile.Files[i].Type == dotmanState.TypeGenerated {
+				case dotmanState.TypeGenerated:
 					// Create generated file
 					targetPath := stateFile.Files[i].Target
 

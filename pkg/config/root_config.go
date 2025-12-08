@@ -36,6 +36,10 @@ func LoadRootConfig(dir string) (RootConfig, error) {
 		return RootConfig{}, fmt.Errorf("failed to parse root config file %s: %w", configPath, err)
 	}
 
+	if config.Vars == nil {
+		config.Vars = make(map[string]string)
+	}
+
 	if _, ok := config.Vars["DONT_EDIT"]; !ok {
 		config.Vars["DONT_EDIT"] = "!!! THIS FILE IS GENERATED. DON'T EDIT THIS FILE !!!"
 	}

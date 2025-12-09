@@ -158,7 +158,7 @@ func (i *Installer) installSymlinks(ops []FileOperation, symlinkMgr *filesystem.
 			}
 		}
 		result.CreatedLinks = append(result.CreatedLinks, operation)
-		log.Info().Str("source", operation.Source).Str("target", operation.Target).Msg("Created symlink")
+		log.Debug().Str("source", operation.Source).Str("target", operation.Target).Msg("Created symlink")
 
 		if !result.IsSuccess {
 			break
@@ -187,7 +187,7 @@ func (i *Installer) installTemplates(ops []FileOperation, vars map[string]string
 				}
 			}
 			result.CreatedTemplates = append(result.CreatedTemplates, operation)
-			log.Info().Str("source", operation.Source).Str("target", operation.Target).Msg("Created template file")
+			log.Debug().Str("source", operation.Source).Str("target", operation.Target).Msg("Created template file")
 		}
 
 		if !result.IsSuccess {

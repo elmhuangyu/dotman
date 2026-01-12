@@ -3,7 +3,7 @@ module github.com/elmhuangyu/dotman
 go 1.25.4
 
 require (
-	github.com/goccy/go-yaml v1.19.0
+	github.com/goccy/go-yaml v1.19.2
 	github.com/rs/zerolog v1.34.0
 	github.com/spf13/cobra v1.10.1
 	github.com/stretchr/testify v1.11.1
